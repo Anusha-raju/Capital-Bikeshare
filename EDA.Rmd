@@ -1,0 +1,44 @@
+---
+title: "Analysis and modelling on the Capital Bikeshare data"
+author: "[Anusha Umashankar](https://github.com/Anusha-raju)| [Aidan Carlisle](https://github.com/acarlisle8)| [Rachel Thomas](https://github.com/releered)| [Sayan Patra](https://github.com/Sayanpatraa) - Group 8 "
+# date: "today"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    number_sections: false
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+<style>
+
+h1 { color: #800000; }  
+
+h2 { color: #000080; } 
+h3 { color: #004d4d; } 
+
+</style>
+
+```{r init, include=F}
+# The package "ezids" (EZ Intro to Data Science) includes a lot of the helper functions we developed for the course. 
+# Some of the frequently used functions are loadPkg(), xkabledply(), xkablesummary(), uzscale(), etc.
+# Once installed, load the library.
+library(ezids)
+```
+
+
+```{r setup, include=FALSE}
+# some of common options (and the defaults) are: 
+# include=T, eval=T, echo=T, results='hide'/'asis'/'markup',..., collapse=F, warning=T, message=T, error=T, cache=T, fig.width=6, fig.height=4, fig.dim=c(6,4) #inches, fig.align='left'/'center','right', 
+knitr::opts_chunk$set(warning = F, results = "markup", message = F)
+options(scientific=T, digits = 3) 
+```
+
+```{r include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+```
+
