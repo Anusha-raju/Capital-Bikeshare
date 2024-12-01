@@ -69,10 +69,11 @@ capital_bikeshare <- capital_bikeshare %>%
   filter(!is.na(end_lat))
 ```
 
+
 2. Reverse Geocoding: Converting Latitude and Longitude Coordinates to Addresses
 ```{r}
-capital_bikeshare$start_addy<-reverse_geocode(capital_bikeshare, lat = "start_lat", long = "start_lng")
-capital_bikeshare$end_addy<-reverse_geocode(capital_bikeshare, lat = "end_lat", long = "end_lng")
+#capital_bikeshare$start_addy<-reverse_geocode(capital_bikeshare, lat = "start_lat", long = "start_lng")
+#capital_bikeshare$end_addy<-reverse_geocode(capital_bikeshare, lat = "end_lat", long = "end_lng")
 ```
 
 3. `Distance (in miles)` is derived using the latitude and longitude coordinates of the start and end points. The `distVincentySphere()` function from the `geosphere` package in R is used to compute the geodesic distance, factoring in the Earth's curvature.
