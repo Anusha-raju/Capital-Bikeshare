@@ -60,7 +60,7 @@ colnames(capital_bikeshare)
 
 1. 
 There are data points where information like start_station_name & id , end_station_name & id , and end_lat and end_lng are missing. 
-`colSums(is.na(capital_bikeshare))`.
+`r colSums(is.na(capital_bikeshare))`.
 
 Dropping the `r colSums(is.na(capital_bikeshare))["end_lat"]` rows as they consitute only `r colSums(is.na(capital_bikeshare))["end_lat"]/nrow(capital_bikeshare)*100` percent of the dataset.
 
@@ -129,8 +129,129 @@ capital_bikeshare <- capital_bikeshare %>%
 **The following attributes are considered for further Exploratory Data Analysis (EDA):**
 
 ```{r}
-filtered_capital_bikeshare <- capital_bikeshare %>% select(rideable_type,member_casual,distance_miles,ride_duration_mins, start_time_period, start_addy, end_addy)
+#filtered_capital_bikeshare <- capital_bikeshare %>% select(rideable_type,member_casual,distance_miles,ride_duration_mins, start_time_period, start_addy, end_addy)
+filtered_capital_bikeshare <- capital_bikeshare %>% select(rideable_type,member_casual,distance_miles,ride_duration_mins, start_time_period)
 ```
 
+*Factorizing `rideable_type`, `member_casual` and `start_time_period` variables:*
+```{r}
+filtered_capital_bikeshare$rideable_type <- as.factor(filtered_capital_bikeshare$rideable_type) 
+filtered_capital_bikeshare$member_casual <- as.factor(filtered_capital_bikeshare$member_casual)
+filtered_capital_bikeshare$start_time_period <- as.factor(filtered_capital_bikeshare$start_time_period)
+```
+
+*Removing outliers*
+```{r}
+#for distance_miles
+z_scores_DM <- scale(filtered_capital_bikeshare$distance_miles)
+outliers <- which(abs(z_scores_DM) > 3)
+capital_bikeshare_clean <- filtered_capital_bikeshare[-outliers, ]
+
+# for ride_duration_mins
+z_scores_RDM <- scale(capital_bikeshare_clean$ride_duration_mins)
+outliers <- which(abs(z_scores_RDM) > 2)
+capital_bikeshare_clean <- capital_bikeshare_clean[-outliers, ]
+
+```
+
+After cleaning the dataset the number of rows are `r nrow(capital_bikeshare_clean`.
+
+# Visualizations:
+*1. Frequency of electric bike versus classic bike rentals*
+```{r}
+
+bike_type_counts <- table(capital_bikeshare_clean$rideable_type)
+
+bike_type_df <- as.data.frame(bike_type_counts)
+
+# Create a bar plot to visualize the frequency of bike rentals by type
+ggplot(bike_type_df, aes(x = Var1, y = Freq, fill = Var1)) + 
+  geom_bar(stat = "identity") + 
+  labs(title = "Frequency of Electric Bike vs Classic Bike Rentals",
+       x = "Bike Type",
+       y = "Frequency of Rentals") + 
+  scale_fill_manual(values = c("electric_bike" = "violet", "classic_bike" = "lightblue")) +  
+  theme_minimal()
+```
+
+- The higher frequency of electric bike rentals compared to classic bikes in the dataset indicates a preference for electric bikes. 
+
+
+*2. Distribution of duration rides on electric bike versus classic bike*
+
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = ride_duration_mins, fill = rideable_type)) +
+  geom_density(alpha = 0.9) +  # Alpha sets the transparency for overlapping areas
+  labs(title = "Distribution of Ride Durations for Electric vs Classic Bikes",
+       x = "Ride Duration (minutes)",
+       y = "Density") +
+  scale_fill_manual(values = c("electric_bike" = "red", "classic_bike" = "green")) +  
+  theme_minimal()
+```
+Box plot
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = rideable_type, y = ride_duration_mins, fill = rideable_type)) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Ride Durations for Electric vs Classic Bikes",
+       x = "Bike Type",
+       y = "Ride Duration (minutes)") +
+  scale_fill_manual(values = c("electric_bike" = "blue", "classic_bike" = "green")) +
+  theme_minimal()
+```
+
+
+
+*3. Frequency of user types*
+
+```{r}
+user_type_counts <- table(capital_bikeshare_clean$member_casual)
+
+user_type_df <- as.data.frame(user_type_counts)
+
+ggplot(user_type_df, aes(x = Var1, y = Freq, fill = Var1)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Frequency of User Types (Member vs Casual)",
+       x = "User Type",
+       y = "Frequency") +
+  scale_fill_manual(values = c("member" = "blue", "casual" = "green")) +  
+  theme_minimal()
+```
+
+
+
+Pie chart:
+```{r}
+ggplot(user_type_df, aes(x = "", y = Freq, fill = User_Type)) +
+  geom_bar(stat = "identity", width = 1) + 
+  coord_polar(theta = "y") +  # Convert the bar chart into a pie chart
+  labs(title = "Proportion of User Types (Member vs Casual)") +
+  scale_fill_manual(values = c("member" = "blue", "casual" = "green")) +
+  theme_void() 
+```
+
+*4. User Types by Rideable Type*
+```{r}
+user_bike_counts <- capital_bikeshare_clean %>%
+  group_by(member_casual, rideable_type) %>%
+  summarise(Freq = n())  
+
+ggplot(user_bike_counts, aes(x = rideable_type, y = Freq, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "dodge") +  
+  labs(title = "User Type Distribution by Rideable Type",
+       x = "Rideable Type (Bike Type)",
+       y = "Frequency of Rides") +
+  scale_fill_manual(values = c("member" = "pink", "casual" = "yellow")) +  
+  theme_minimal()
+```
+
+```{r}
+ggplot(user_bike_counts, aes(x = rideable_type, y = Freq, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "fill") +  # 'fill' stacks the bars to show proportions
+  labs(title = "Proportional User Type Distribution by Rideable Type",
+       x = "Rideable Type (Bike Type)",
+       y = "Proportion of Rides") +
+  scale_fill_manual(values = c("member" = "pink", "casual" = "violet")) +  
+  theme_minimal()
+```
 
 
