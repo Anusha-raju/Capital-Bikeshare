@@ -40,5 +40,215 @@ options(scientific=T, digits = 3)
 library(dplyr)
 library(ggplot2)
 library(tidyr)
+library(geosphere)
 ```
+
+
+```{r}
+capital_bikeshare <- read.csv("~/workspace/Data science/Capital-Bikeshare/202410-capitalbikeshare-tripdata.csv", header = TRUE)
+```
+
+The dataset contains the following attributes.
+```{r}
+colnames(capital_bikeshare)
+```
+
+# Preprocessing:
+
+1. `Distance (in miles)` is derived using the latitude and longitude coordinates of the start and end points. The `distVincentySphere()` function from the `geosphere` package in R is used to compute the geodesic distance, factoring in the Earth's curvature.
+
+```{r}
+# Calculate the distance for each row and add it as a new column (in miles)
+capital_bikeshare$distance_miles <- mapply(function(lat1, lon1, lat2, lon2) {
+  distVincentySphere(c(lon1, lat1), c(lon2, lat2)) / 1000 * 0.621371  
+}, capital_bikeshare$start_lat, capital_bikeshare$start_lng, capital_bikeshare$end_lat, capital_bikeshare$end_lng)
+```
+
+
+2. Calculated the total ride time by subtracting `started_at` from `ended_at.`
+```{r}
+capital_bikeshare$started_at <- as.POSIXct(capital_bikeshare$started_at, format="%Y-%m-%d %H:%M:%OS")
+capital_bikeshare$ended_at <- as.POSIXct(capital_bikeshare$ended_at, format="%Y-%m-%d %H:%M:%OS")
+capital_bikeshare$ride_duration_mins <- as.numeric(difftime(capital_bikeshare$ended_at, capital_bikeshare$started_at, units = "mins"))
+```
+
+
+3. Categorizing Rides by Time Period.
+```{r}
+get_time_period <- function(time) {
+  hour <- as.numeric(format(time, "%H"))
+  
+  if (hour >= 4 & hour < 6) {
+    return("Early Morning")
+  } else if (hour >= 6 & hour < 9) {
+    return("Morning")
+  } else if (hour >= 9 & hour < 12) {
+    return("Mid-Morning")
+  } else if (hour >= 12 & hour < 13) {
+    return("Midday")
+  } else if (hour >= 13 & hour < 17) {
+    return("Afternoon")
+  } else if (hour >= 17 & hour < 19) {
+    return("Evening")
+  } else if (hour >= 19 & hour < 21) {
+    return("Late Evening")
+  } else {
+    return("Night")
+  }
+}
+
+
+capital_bikeshare <- capital_bikeshare %>%
+  mutate(
+    start_time_period = sapply(started_at, get_time_period),
+  )
+```
+
+**The following attributes are considered for further Exploratory Data Analysis (EDA):**
+
+```{r}
+filtered_capital_bikeshare <- capital_bikeshare %>% select(rideable_type,member_casual,distance_miles,ride_duration_mins, start_time_period)
+```
+
+
+
+
+
+#Preprocessing
+
+oct2024_capbike <- X202410_capitalbikeshare_tripdata
+
+summary(oct2024_capbike)
+
+str(oct2024_capbike)
+unique(oct2024_capbike$rideable_type)
+unique(oct2024_capbike$member_casual)
+
+# Factorize categorical variables
+oct2024_capbike$rideable_type <- factor(oct2024_capbike$rideable_type)
+oct2024_capbike$member_casual <- factor(oct2024_capbike$member_casual)
+
+str(oct2024_capbike)
+
+#Compute duration of each ride
+oct2024_capbike$duration_seconds <- as.numeric(difftime(oct2024_capbike$ended_at, oct2024_capbike$started_at, units = "secs"))
+
+oct2024_capbike$duration_minutes <- oct2024_capbike$duration_seconds / 60
+
+str(oct2024_capbike)
+summary(oct2024_capbike)
+
+#Compute distance traveled for each ride
+
+install.packages("sf")
+library(sf)
+
+sum(is.na(oct2024_capbike$end_lat))
+sum(is.na(oct2024_capbike$end_lng))
+
+capbike_clean <- oct2024_capbike[!is.na(oct2024_capbike$end_lat) & !is.na(oct2024_capbike$end_lng), ]
+
+sum(is.na(capbike_clean$end_lat))
+sum(is.na(capbike_clean$end_lng))
+sum(is.na(oct2024_capbike$start_lat))
+sum(is.na(oct2024_capbike$start_lng))
+
+capbike_sf <- st_as_sf(capbike_clean, coords = c("start_lng", "start_lat"), crs = 4326)
+end_points <- st_as_sf(capbike_clean, coords = c("end_lng", "end_lat"), crs = 4326)
+
+capbike_clean$distance_meters <- st_distance(capbike_sf, end_points, by_element = TRUE)
+
+capbike_clean$distance_km <- as.numeric(capbike_clean$distance_meters) / 1000
+
+str(capbike_clean)
+summary(capbike_clean)
+
+#Assess outliers
+capbike_clean <- outlierKD2(capbike_clean, duration_minutes, rm = TRUE, boxplt = TRUE, qqplt = TRUE)
+
+capbike_clean <- outlierKD2(capbike_clean, distance_km, rm = TRUE, boxplt = TRUE, qqplt = TRUE)
+
+# The outliers for duration are crazy extreme (max 1500 minutes) - vs without the outliers max is 34. Removing the outliers removes ~54.5k obs, which is a lot, but still leaves 670279 obs which I think is more than enough. So my vote is to remove the outliers. I applied the outlierKD2 here too - removed 31014 obs, but still have more than 600k which is more than enough. So I've made the executive decision to remove all of the NAs in duration_minutes and distance_km from the dataset (we can obviously undo if you guys disagree).
+
+capbike_cleanest <- capbike_clean %>%
+  filter(!is.na(distance_km) & !is.na(duration_minutes))
+
+
+#EDA
+
+# SMART1: Bar plot for frequency of bike type
+
+ggplot(data = capbike_cleanest, aes(x = rideable_type)) +
+  geom_bar(fill = "steelblue", color = "black") +
+  labs(
+    title = "Distribution of Bike Types",
+    x = "Type of Bike",
+    y = "Frequency"
+  ) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal()
+  
+  
+# SMART2: Distribution of duration on ebike v classic
+
+ggplot(capbike_cleanest, aes(x = duration_minutes, fill = rideable_type)) +
+  geom_histogram(binwidth = 2, color = "black", alpha = 0.7, position = "dodge") +
+  labs(
+    title = "Distribution of Ride Duration by Bike Type",
+    x = "Ride Duration (Minutes)",
+    y = "Frequency"
+  ) +
+  scale_fill_manual(values = c("electric_bike" = "blue", "classic_bike" = "orange")) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal()
+  
+ggplot(capbike_cleanest, aes(x = rideable_type, y = duration_minutes, fill = rideable_type)) +
+  geom_boxplot() +
+  labs(
+    title = "Box Plot of Ride Duration by Bike Type",
+    x = "Rideable Type",
+    y = "Duration (Minutes)"
+  ) +
+  scale_fill_manual(values = c("electric_bike" = "blue", "classic_bike" = "orange")) +  # Custom colors
+  theme_minimal()
+
+
+
+# SMART3: Distribution of distances ridde by bike type. 
+
+ggplot(capbike_cleanest, aes(x = distance_km, fill = rideable_type)) +
+  geom_histogram(binwidth = 0.3, color = "black", alpha = 0.7, position = "dodge") +
+  labs(
+    title = "Distribution of Ride Distance by Bike Type",
+    x = "Ride Distance (km)",
+    y = "Frequency"
+  ) +
+  scale_fill_manual(values = c("electric_bike" = "blue", "classic_bike" = "orange")) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal()
+  
+ggplot(capbike_cleanest, aes(x = rideable_type, y = distance_km, fill = rideable_type)) +
+  geom_boxplot() +
+  labs(
+    title = "Box Plot of Ride Distance by Bike Type",
+    x = "Rideable Type",
+    y = "Distance (km)"
+  ) +
+  scale_fill_manual(values = c("electric_bike" = "blue", "classic_bike" = "orange")) + 
+  theme_minimal()
+  
+# SMART4: Frequency of user types
+
+ggplot(data = capbike_cleanest, aes(x = member_casual)) +
+  geom_bar(fill = "steelblue", color = "black") +
+  labs(
+    title = "Distribution of User Types",
+    x = "Type of User",
+    y = "Frequency"
+  ) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal()
+
+
+  
 
