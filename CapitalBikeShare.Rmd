@@ -324,3 +324,123 @@ riderLogit_refined <- glm(
   family = "binomial",
   data = capital_bikeshare_clean
 )
+
+
+
+Model to predict the duration of the ride based on trip characteristics and type of rider.
+```{r}
+library(rpart)
+library(rpart.plot)
+DurationModel <- rpart(ride_duration_mins ~ rideable_type + member_casual + distance_miles + start_time_period, data = capital_bikeshare_clean, method = "anova")
+
+```
+*Summary of Duration Model*
+```{r}
+print(summary(DurationModel))
+```
+
+
+
+```{r}
+rpart.plot(DurationModel, type = 3, extra = 1, main = "Regression Tree for Ride Duration Prediction")
+
+```
+Regression tree to predict ride duration in minutes based on rideable_type, member_casual, distance_miles, and start_time_period.
+
+
+- The root node contains all observations, with an average ride duration of 12.7 minutes.
+
+- The first major split occurs at 1.55 miles for distance_miles. This results in two main branches:
+
+  - For distances less than 1.55 miles, the average ride duration is 9.86 minutes.
+  - For distances greater than or equal to 1.55 miles, the average ride duration increases to 20.7 minutes.
+  
+Key Predictors:
+
+Distance is the primary factor influencing ride duration, with significant splits at 0.871 miles and 2.46 miles.
+Rideable type and member status also significantly affect ride duration:
+Members tend to have shorter ride durations than casual riders, especially for shorter distances.
+Electric bikes are associated with shorter ride durations compared to classic bikes.
+
+
+For trips with distance_miles < 0.871 and member status = member, the ride duration averages 6.96 minutes.
+For casual riders with distance_miles < 0.871, the average ride duration is 10.90 minutes.
+For trips with distance_miles ≥ 0.871 and < 2.46, the average duration is 12.6 minutes. Here, electric bike rides average 11.0 minutes, and classic bike rides average 15.2 minutes.
+For longer trips with distance_miles ≥ 2.46, the ride duration increases further to 25.8 minutes, with electric bike rides averaging 23.6 minutes and classic bike rides averaging 32.4 minutes.
+Model Performance:
+
+The model effectively splits based on the most significant predictors, with the tree having 8 terminal nodes.
+
+```{r}
+library(rattle)
+fancyRpartPlot(DurationModel)
+```
+
+
+```{r}
+print(DurationModel$cptable)
+```
+From this table:
+
+The lowest xerror occurs at cp = 0.0100, where xerror is 0.689.
+However, the xerror is very close between cp = 0.0102 (0.697) and cp = 0.0100 (0.689). The difference is very small, suggesting that the improvement in error with cp = 0.0100 is marginal.
+```{r}
+plotcp(DurationModel)
+```
+
+Cross- validation:
+
+```{r, results="markup"}
+fold <- floor(runif(nrow(capital_bikeshare_clean),1,11)) 
+capital_bikeshare_clean$fold <- fold
+## the test set is just the first fold 
+test.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold == 1,] 
+##exclude the first fold from the data here 
+train.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold != 1,]
+DurationModel_fold <- rpart(ride_duration_mins ~ rideable_type + member_casual +distance_miles + start_time_period, data=train.set, method="anova" )
+fancyRpartPlot(DurationModel_fold)
+```
+
+```{r}
+pred <- predict(DurationModel_fold, test.set) 
+plot(pred,test.set$ride_duration_mins, main="Predicted vs. Observed ride_duration_mins", xlab="Tree Predicted ride_duration_mins", ylab="Observed ride_duration_mins")
+treefit_fold_error = sum(pred-test.set$ride_duration_mins)^2
+print(treefit_fold_error)
+```
+The tree fold error is too large.
+
+now considering only `rideable_type`, `member_casual`, `start_time_period`.
+```{r, results="markup"}
+DurationModel_fold2 <- rpart(ride_duration_mins ~ rideable_type + member_casual  + start_time_period, data=train.set, method="anova" )
+fancyRpartPlot(DurationModel_fold2)
+```
+
+```{r}
+pred2 <- predict(DurationModel_fold2, test.set) 
+plot(pred2,test.set$ride_duration_mins, main="Predicted vs. Observed ride_duration_mins", xlab="Tree Predicted ride_duration_mins", ylab="Observed ride_duration_mins")
+treefit_fold_error2 = sum(pred2-test.set$ride_duration_mins)^2
+print(treefit_fold_error2)
+```
+
+
+The tree fold error is reduced  but still is large. But given that the test data is `r nrow(test.set)` the average error per prediction is `r treefit_fold_error2/nrow(test.set)`.
+
+```{r}
+summary(DurationModel_fold2)
+```
+
+To predict for a new data.
+
+```{r}
+new_data <- data.frame(
+  rideable_type = factor("electric_bike"),
+  member_casual = factor("casual"),
+  start_time_period = factor("Morning")
+)
+
+# Predict the ride duration
+predicted_duration <- predict(DurationModel_fold2, new_data)
+predicted_duration
+```
+
+
