@@ -154,7 +154,7 @@ capital_bikeshare_clean <- capital_bikeshare_clean[-outliers, ]
 
 ```
 
-After cleaning the dataset the number of rows are `r nrow(capital_bikeshare_clean`.
+After cleaning the dataset the number of rows are `r nrow(capital_bikeshare_clean)`.
 
 # Visualizations:
 *1. Frequency of electric bike versus classic bike rentals*
@@ -246,7 +246,7 @@ ggplot(user_bike_counts, aes(x = rideable_type, y = Freq, fill = member_casual))
 
 ```{r}
 ggplot(user_bike_counts, aes(x = rideable_type, y = Freq, fill = member_casual)) +
-  geom_bar(stat = "identity", position = "fill") +  # 'fill' stacks the bars to show proportions
+  geom_bar(stat = "identity", position = "fill") +  
   labs(title = "Proportional User Type Distribution by Rideable Type",
        x = "Rideable Type (Bike Type)",
        y = "Proportion of Rides") +
@@ -254,4 +254,73 @@ ggplot(user_bike_counts, aes(x = rideable_type, y = Freq, fill = member_casual))
   theme_minimal()
 ```
 
+# Predict the rider's class based on trip characteristics
+```{r}
+riderLogit <- glm(member_casual ~ rideable_type + distance_miles + ride_duration_mins + start_time_period, data = capital_bikeshare_clean, family = "binomial")
 
+summary(riderLogit)
+```
+
+Electric bike reduces the log-odds of being a member compared to a classic bike.
+Electric scooter strongly reduces the log-odds of being a member compared to the classic bike.
+Positive distance coefficient indicates longer distances increase the likelihood of being a member.
+Negative duration coefficition indicates that longer rides decrease the likelihood of being a member.
+Evening, Late evening, Mid-morning, and Morning increase the log-odds of being a member. Night decreases the log odds of being a member. 
+Early morning and midday are not statistically significant.
+
+```{r}
+exp(coef(riderLogit))
+```
+
+The odds of being a member (the intercept) is 2.78 times higher than being a casual rider.
+The OR for electric bike is 0.88, meaning the odds of being a member are about 12% lower (1-0.88) for electric bike users compared to classic bike.
+The OR for electric scooter is 0.07, meaning the odds of bing a member are about 93% lower (1-0.07) for electric scooter users compared to classic bike.
+The OR for distance is 1.2126, meaning each additional mile traveled increased the odds of being a member by 21.26%.
+The OR for duration is 0.9570, meaning each additional minute of ride duration decreases the odds of the being a member by 4.3% (1-0.9570).
+The OR for early morning is 0.9767, meaning rides starting during that time period have a 2.33% (1-0.9767) lower odds of being a member compared to afternoon (the reference period).
+The OR for evening is 1.1349, meaning rides starting in the evening have 13.49% higher odds of being a member compared to the afternoon.
+The OR for Late evening is 1.1025, meaning rides starting in the late evening have a 10.25% higher odds of being a member compared to the afternoon.
+The OR for mid-morning is 1.0743, meaning these rides have 7.43% higher odds of being a member.
+The OR for Midday is 1.0063, meaning these rides have 0.63% higher odds of being a member.
+The OR for morning is 1.6012, meaning morning rides have 60% higher odds of being a member.
+The OR for Night is 0.9571, meaning night rides have 4.29% lower odds of being a member.
+
+Members are more likely to use classic bikes. take longer rides, ride for shorter duration, and are most associated with morning and evening rides.
+
+```{r}
+predicted <- ifelse(predict(riderLogit, type = "response") > 0.5, "member", "casual")
+conf_matrix <- table(Predicted = predicted, Actual = capital_bikeshare_clean$member_casual)
+TP <- conf_matrix[2, 2] 
+TN <- conf_matrix[1, 1]  
+FP <- conf_matrix[1, 2]  
+FN <- conf_matrix[2, 1]  
+accuracy <- (TP + TN) / (TP + TN + FP + FN)  
+print(paste("Accuracy:", round(accuracy, 4)))
+```
+
+This model's accuracy is `r round(accuracy, 4)))` which is not great.
+
+```{r}
+library(car)
+vif(riderLogit)
+```
+
+The VIF has all variables at nearly 1 which means there is no appreciable multicollinearity.
+
+```{r}
+riderLogit_stepwise <- step(
+  riderLogit, 
+  direction = "backward"
+)
+```
+
+The AIC is increased by removing any of the predictors, much worse if you remove duration, and much, much worse if you remove rideable_type. So these predictors all contribute meaningfully to the model.
+
+riderLogit_refined <- glm(
+  member_casual ~ rideable_type + distance_miles + ride_duration_mins + 
+    start_time_periodEvening + start_time_periodLate Evening +
+    start_time_periodMid-Morning + start_time_periodMorning + 
+    start_time_periodNight,
+  family = "binomial",
+  data = capital_bikeshare_clean
+)
