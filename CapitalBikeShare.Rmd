@@ -42,19 +42,22 @@ library(ggplot2)
 library(tidyr)
 library(geosphere)
 library(tidygeocoder)
-
-```
-
-
-
-
 library(caret)
 library(lattice)
+library(lubridate)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+library(car)
 ```
+
+
+
+capital_bikeshare <- X202410_capitalbikeshare_tripdata
 
 
 ```{r}
-file_path <- file.path(getwd(), "202410-capitalbikeshare-tripdata.csv")
+file_path <- file.path(getwd(), "X202410_capitalbikeshare_tripdata.csv")
 capital_bikeshare <- read.csv(file_path, header = TRUE)
 ```
 
@@ -132,19 +135,27 @@ capital_bikeshare <- capital_bikeshare %>%
   )
 ```
 
+6. Categorizing rides by weekday vs weekend
+```{r}
+capital_bikeshare$day_type <- ifelse(wday(capital_bikeshare$started_at) %in% c(1, 7), "weekend", "weekday")
+
+```
+
+
 
 **The following attributes are considered for further Exploratory Data Analysis (EDA):**
 
 ```{r}
 #filtered_capital_bikeshare <- capital_bikeshare %>% select(rideable_type,member_casual,distance_miles,ride_duration_mins, start_time_period, start_addy, end_addy)
-filtered_capital_bikeshare <- capital_bikeshare %>% select(rideable_type,member_casual,distance_miles,ride_duration_mins, start_time_period)
+filtered_capital_bikeshare <- capital_bikeshare %>% select(rideable_type,member_casual,distance_miles,ride_duration_mins, start_time_period,day_type)
 ```
 
-*Factorizing `rideable_type`, `member_casual` and `start_time_period` variables:*
+*Factorizing 'rideable_type', 'member_casual', 'start_time_period', and 'day_type' variables:*
 ```{r}
 filtered_capital_bikeshare$rideable_type <- as.factor(filtered_capital_bikeshare$rideable_type) 
 filtered_capital_bikeshare$member_casual <- as.factor(filtered_capital_bikeshare$member_casual)
 filtered_capital_bikeshare$start_time_period <- as.factor(filtered_capital_bikeshare$start_time_period)
+filtered_capital_bikeshare$day_type <- as.factor(filtered_capital_bikeshare$day_type)
 ```
 
 *Removing outliers*
@@ -261,9 +272,20 @@ ggplot(user_bike_counts, aes(x = rideable_type, y = Freq, fill = member_casual))
   theme_minimal()
 ```
 
+*5. Member vs Casual bike usage on weekdays vs weekends*
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = day_type, fill = interaction(member_casual, rideable_type))) +
+  geom_bar(position = "dodge") + # Dodged bars for separate member_casual and rideable_type combinations
+  labs(title = "Rides by Day Type (Weekday vs Weekend)",
+       x = "Day Type",
+       y = "Count",
+       fill = "Member Type & Rideable Type") +
+  theme_minimal()
+```
+
 # Predict the rider's class based on trip characteristics
 ```{r}
-riderLogit <- glm(member_casual ~ rideable_type + distance_miles + ride_duration_mins + start_time_period, data = capital_bikeshare_clean, family = "binomial")
+riderLogit <- glm(member_casual ~ rideable_type + distance_miles + ride_duration_mins + start_time_period + day_type, data = capital_bikeshare_clean, family = "binomial")
 
 summary(riderLogit)
 
@@ -318,7 +340,7 @@ Members are more likely to use classic bikes. take longer rides, ride for shorte
 ```{r}
 predicted <- ifelse(predict(riderLogit, type = "response") > 0.5, "member", "casual")
 conf_matrix <- table(Predicted = predicted, Actual = capital_bikeshare_clean$member_casual)
-
+```
 The odds of being a member (the intercept) is 2.82 times higher than being a casual rider.
 The OR for electric bike is 0.937, meaning the odds of being a member are about 6.3% lower (1-0.937) for electric bike users compared to classic bike.
 The OR for distance is 1.157, meaning each additional mile traveled increased the odds of being a member by 15.7%.
@@ -407,7 +429,7 @@ print(paste("Accuracy:", round(accuracy, 4)))
 
 ```{r}
 
-library(car)
+
 vif(riderLogit)
 ```
 
@@ -466,8 +488,7 @@ Model to predict the duration of the ride based on trip characteristics and type
 # Model to predict the duration of the ride based on trip characteristics and type of rider.
 
 ```{r}
-library(rpart)
-library(rpart.plot)
+
 DurationModel <- rpart(ride_duration_mins ~ rideable_type + member_casual + distance_miles + start_time_period, data = capital_bikeshare_clean, method = "anova")
 
 ```
@@ -509,10 +530,9 @@ Model Performance:
 The model effectively splits based on the most significant predictors, with the tree having 8 terminal nodes.
 
 ```{r}
-library(rattle)
 
 # Build a tree for member_casual
-Member_casual_tree <- rpart(member_casual~ rideable_type + distance_miles + ride_duration_mins + start_time_period, data = capital_bikeshare_clean, method = "class")
+Member_casual_tree <- rpart(member_casual~ rideable_type + distance_miles + ride_duration_mins + start_time_period + day_type, data = capital_bikeshare_clean, method = "class")
 
 # Plot the tree
 tree_vis <- rpart.plot(Member_casual_tree, type = 3, extra = 1, main = "Classification Tree for Member vs Casual Prediction")
@@ -530,7 +550,7 @@ fold <- floor(runif(nrow(capital_bikeshare_clean),1,11))
 test.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold == 1,] 
 ##exclude the first fold from the data here 
 train.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold != 1,]
-treefit_fold <- rpart(member_casual~ rideable_type + distance_miles + ride_duration_mins + start_time_period, data = capital_bikeshare_clean, method = "class")
+treefit_fold <- rpart(member_casual~ rideable_type + distance_miles + ride_duration_mins + start_time_period, day_type, data = capital_bikeshare_clean, method = "class")
 
 fancyRpartPlot(treefit_fold)
 
