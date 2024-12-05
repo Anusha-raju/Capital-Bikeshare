@@ -1,0 +1,486 @@
+---
+title: "Analysis and modelling on the Capital Bikeshare data"
+author: "[Anusha Umashankar](https://github.com/Anusha-raju)| [Aidan Carlisle](https://github.com/acarlisle8)| [Rachel Thomas](https://github.com/releered)| [Sayan Patra](https://github.com/Sayanpatraa) - Group 8 "
+# date: "today"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    number_sections: false
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+<style>
+
+h1 { color: #800000; }  
+
+h2 { color: #000080; } 
+h3 { color: #004d4d; } 
+
+</style>
+
+```{r init, include=F}
+# The package "ezids" (EZ Intro to Data Science) includes a lot of the helper functions we developed for the course. 
+# Some of the frequently used functions are loadPkg(), xkabledply(), xkablesummary(), uzscale(), etc.
+# Once installed, load the library.
+library(ezids)
+```
+
+
+```{r setup, include=FALSE}
+# some of common options (and the defaults) are: 
+# include=T, eval=T, echo=T, results='hide'/'asis'/'markup',..., collapse=F, warning=T, message=T, error=T, cache=T, fig.width=6, fig.height=4, fig.dim=c(6,4) #inches, fig.align='left'/'center','right', 
+knitr::opts_chunk$set(warning = F, results = "markup", message = F)
+options(scientific=T, digits = 3) 
+```
+
+```{r include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(geosphere)
+library(tidygeocoder)
+```
+
+
+
+```{r}
+file_path <- file.path(getwd(), "202410-capitalbikeshare-tripdata.csv")
+capital_bikeshare <- read.csv(file_path, header = TRUE)
+```
+
+The dataset contains the following attributes.
+```{r}
+colnames(capital_bikeshare)
+```
+
+# Preprocessing:
+
+1. 
+There are data points where information like start_station_name & id , end_station_name & id , and end_lat and end_lng are missing. 
+`r colSums(is.na(capital_bikeshare))`.
+
+Dropping the `r colSums(is.na(capital_bikeshare))["end_lat"]` rows as they consitute only `r colSums(is.na(capital_bikeshare))["end_lat"]/nrow(capital_bikeshare)*100` percent of the dataset.
+
+```{r}
+capital_bikeshare <- capital_bikeshare %>%
+  filter(!is.na(end_lat))
+```
+
+
+2. Reverse Geocoding: Converting Latitude and Longitude Coordinates to Addresses
+```{r}
+#capital_bikeshare$start_addy<-reverse_geocode(capital_bikeshare, lat = "start_lat", long = "start_lng")
+#capital_bikeshare$end_addy<-reverse_geocode(capital_bikeshare, lat = "end_lat", long = "end_lng")
+```
+
+3. `Distance (in miles)` is derived using the latitude and longitude coordinates of the start and end points. The `distVincentySphere()` function from the `geosphere` package in R is used to compute the geodesic distance, factoring in the Earth's curvature.
+
+```{r}
+# Calculate the distance for each row and add it as a new column (in miles)
+capital_bikeshare$distance_miles <- mapply(function(lat1, lon1, lat2, lon2) {
+  distVincentySphere(c(lon1, lat1), c(lon2, lat2)) / 1000 * 0.621371  
+}, capital_bikeshare$start_lat, capital_bikeshare$start_lng, capital_bikeshare$end_lat, capital_bikeshare$end_lng)
+```
+
+
+4. Calculated the total ride time by subtracting `started_at` from `ended_at.`
+```{r}
+capital_bikeshare$started_at <- as.POSIXct(capital_bikeshare$started_at, format="%Y-%m-%d %H:%M:%OS")
+capital_bikeshare$ended_at <- as.POSIXct(capital_bikeshare$ended_at, format="%Y-%m-%d %H:%M:%OS")
+capital_bikeshare$ride_duration_mins <- as.numeric(difftime(capital_bikeshare$ended_at, capital_bikeshare$started_at, units = "mins"))
+```
+
+
+5. Categorizing Rides by Time Period.
+```{r}
+get_time_period <- function(time) {
+  hour <- as.numeric(format(time, "%H"))
+  
+  if (hour >= 4 & hour < 6) {
+    return("Early Morning")
+  } else if (hour >= 6 & hour < 9) {
+    return("Morning")
+  } else if (hour >= 9 & hour < 12) {
+    return("Mid-Morning")
+  } else if (hour >= 12 & hour < 13) {
+    return("Midday")
+  } else if (hour >= 13 & hour < 17) {
+    return("Afternoon")
+  } else if (hour >= 17 & hour < 19) {
+    return("Evening")
+  } else if (hour >= 19 & hour < 21) {
+    return("Late Evening")
+  } else {
+    return("Night")
+  }
+}
+
+
+capital_bikeshare <- capital_bikeshare %>%
+  mutate(
+    start_time_period = sapply(started_at, get_time_period),
+  )
+```
+
+
+**The following attributes are considered for further Exploratory Data Analysis (EDA):**
+
+```{r}
+#filtered_capital_bikeshare <- capital_bikeshare %>% select(rideable_type,member_casual,distance_miles,ride_duration_mins, start_time_period, start_addy, end_addy)
+filtered_capital_bikeshare <- capital_bikeshare %>% select(rideable_type,member_casual,distance_miles,ride_duration_mins, start_time_period)
+```
+
+*Factorizing `rideable_type`, `member_casual` and `start_time_period` variables:*
+```{r}
+filtered_capital_bikeshare$rideable_type <- as.factor(filtered_capital_bikeshare$rideable_type) 
+filtered_capital_bikeshare$member_casual <- as.factor(filtered_capital_bikeshare$member_casual)
+filtered_capital_bikeshare$start_time_period <- as.factor(filtered_capital_bikeshare$start_time_period)
+```
+
+*Removing outliers*
+```{r}
+#for distance_miles
+z_scores_DM <- scale(filtered_capital_bikeshare$distance_miles)
+outliers <- which(abs(z_scores_DM) > 3)
+capital_bikeshare_clean <- filtered_capital_bikeshare[-outliers, ]
+
+# for ride_duration_mins
+z_scores_RDM <- scale(capital_bikeshare_clean$ride_duration_mins)
+outliers <- which(abs(z_scores_RDM) > 2)
+capital_bikeshare_clean <- capital_bikeshare_clean[-outliers, ]
+
+```
+
+After cleaning the dataset the number of rows are `r nrow(capital_bikeshare_clean)`.
+
+# Visualizations:
+*1. Frequency of electric bike versus classic bike rentals*
+```{r}
+
+bike_type_counts <- table(capital_bikeshare_clean$rideable_type)
+
+bike_type_df <- as.data.frame(bike_type_counts)
+
+# Create a bar plot to visualize the frequency of bike rentals by type
+ggplot(bike_type_df, aes(x = Var1, y = Freq, fill = Var1)) + 
+  geom_bar(stat = "identity") + 
+  labs(title = "Frequency of Electric Bike vs Classic Bike Rentals",
+       x = "Bike Type",
+       y = "Frequency of Rentals") + 
+  scale_fill_manual(values = c("electric_bike" = "violet", "classic_bike" = "lightblue")) +  
+  theme_minimal()
+```
+
+- The higher frequency of electric bike rentals compared to classic bikes in the dataset indicates a preference for electric bikes. 
+
+
+*2. Distribution of duration rides on electric bike versus classic bike*
+
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = ride_duration_mins, fill = rideable_type)) +
+  geom_density(alpha = 0.9) +  # Alpha sets the transparency for overlapping areas
+  labs(title = "Distribution of Ride Durations for Electric vs Classic Bikes",
+       x = "Ride Duration (minutes)",
+       y = "Density") +
+  scale_fill_manual(values = c("electric_bike" = "red", "classic_bike" = "green")) +  
+  theme_minimal()
+```
+Box plot
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = rideable_type, y = ride_duration_mins, fill = rideable_type)) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Ride Durations for Electric vs Classic Bikes",
+       x = "Bike Type",
+       y = "Ride Duration (minutes)") +
+  scale_fill_manual(values = c("electric_bike" = "blue", "classic_bike" = "green")) +
+  theme_minimal()
+```
+
+
+
+*3. Frequency of user types*
+
+```{r}
+user_type_counts <- table(capital_bikeshare_clean$member_casual)
+
+user_type_df <- as.data.frame(user_type_counts)
+
+ggplot(user_type_df, aes(x = Var1, y = Freq, fill = Var1)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Frequency of User Types (Member vs Casual)",
+       x = "User Type",
+       y = "Frequency") +
+  scale_fill_manual(values = c("member" = "blue", "casual" = "green")) +  
+  theme_minimal()
+```
+
+
+
+Pie chart:
+```{r}
+ggplot(user_type_df, aes(x = "", y = Freq, fill = User_Type)) +
+  geom_bar(stat = "identity", width = 1) + 
+  coord_polar(theta = "y") +  # Convert the bar chart into a pie chart
+  labs(title = "Proportion of User Types (Member vs Casual)") +
+  scale_fill_manual(values = c("member" = "blue", "casual" = "green")) +
+  theme_void() 
+```
+
+*4. User Types by Rideable Type*
+```{r}
+user_bike_counts <- capital_bikeshare_clean %>%
+  group_by(member_casual, rideable_type) %>%
+  summarise(Freq = n())  
+
+ggplot(user_bike_counts, aes(x = rideable_type, y = Freq, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "dodge") +  
+  labs(title = "User Type Distribution by Rideable Type",
+       x = "Rideable Type (Bike Type)",
+       y = "Frequency of Rides") +
+  scale_fill_manual(values = c("member" = "pink", "casual" = "yellow")) +  
+  theme_minimal()
+```
+
+```{r}
+ggplot(user_bike_counts, aes(x = rideable_type, y = Freq, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "fill") +  
+  labs(title = "Proportional User Type Distribution by Rideable Type",
+       x = "Rideable Type (Bike Type)",
+       y = "Proportion of Rides") +
+  scale_fill_manual(values = c("member" = "pink", "casual" = "violet")) +  
+  theme_minimal()
+```
+
+# Predict the rider's class based on trip characteristics
+```{r}
+riderLogit <- glm(member_casual ~ rideable_type + distance_miles + ride_duration_mins + start_time_period, data = capital_bikeshare_clean, family = "binomial")
+
+summary(riderLogit)
+```
+
+Electric bike reduces the log-odds of being a member compared to a classic bike.
+Electric scooter strongly reduces the log-odds of being a member compared to the classic bike.
+Positive distance coefficient indicates longer distances increase the likelihood of being a member.
+Negative duration coefficition indicates that longer rides decrease the likelihood of being a member.
+Evening, Late evening, Mid-morning, and Morning increase the log-odds of being a member. Night decreases the log odds of being a member. 
+Early morning and midday are not statistically significant.
+
+```{r}
+exp(coef(riderLogit))
+```
+
+The odds of being a member (the intercept) is 2.78 times higher than being a casual rider.
+The OR for electric bike is 0.88, meaning the odds of being a member are about 12% lower (1-0.88) for electric bike users compared to classic bike.
+The OR for electric scooter is 0.07, meaning the odds of bing a member are about 93% lower (1-0.07) for electric scooter users compared to classic bike.
+The OR for distance is 1.2126, meaning each additional mile traveled increased the odds of being a member by 21.26%.
+The OR for duration is 0.9570, meaning each additional minute of ride duration decreases the odds of the being a member by 4.3% (1-0.9570).
+The OR for early morning is 0.9767, meaning rides starting during that time period have a 2.33% (1-0.9767) lower odds of being a member compared to afternoon (the reference period).
+The OR for evening is 1.1349, meaning rides starting in the evening have 13.49% higher odds of being a member compared to the afternoon.
+The OR for Late evening is 1.1025, meaning rides starting in the late evening have a 10.25% higher odds of being a member compared to the afternoon.
+The OR for mid-morning is 1.0743, meaning these rides have 7.43% higher odds of being a member.
+The OR for Midday is 1.0063, meaning these rides have 0.63% higher odds of being a member.
+The OR for morning is 1.6012, meaning morning rides have 60% higher odds of being a member.
+The OR for Night is 0.9571, meaning night rides have 4.29% lower odds of being a member.
+
+Members are more likely to use classic bikes. take longer rides, ride for shorter duration, and are most associated with morning and evening rides.
+
+```{r}
+predicted <- ifelse(predict(riderLogit, type = "response") > 0.5, "member", "casual")
+conf_matrix <- table(Predicted = predicted, Actual = capital_bikeshare_clean$member_casual)
+TP <- conf_matrix[2, 2] 
+TN <- conf_matrix[1, 1]  
+FP <- conf_matrix[1, 2]  
+FN <- conf_matrix[2, 1]  
+accuracy <- (TP + TN) / (TP + TN + FP + FN)  
+print(paste("Accuracy:", round(accuracy, 4)))
+```
+
+This model's accuracy is `r round(accuracy, 4)))` which is not great.
+
+```{r}
+library(car)
+vif(riderLogit)
+```
+
+The VIF has all variables at nearly 1 which means there is no appreciable multicollinearity.
+
+```{r}
+riderLogit_stepwise <- step(
+  riderLogit, 
+  direction = "backward"
+)
+```
+
+The AIC is increased by removing any of the predictors, much worse if you remove duration, and much, much worse if you remove rideable_type. So these predictors all contribute meaningfully to the model.
+
+riderLogit_refined <- glm(
+  member_casual ~ rideable_type + distance_miles + ride_duration_mins + 
+    start_time_periodEvening + start_time_periodLate Evening +
+    start_time_periodMid-Morning + start_time_periodMorning + 
+    start_time_periodNight,
+  family = "binomial",
+  data = capital_bikeshare_clean
+)
+
+
+
+Model to predict the duration of the ride based on trip characteristics and type of rider.
+```{r}
+library(rpart)
+library(rpart.plot)
+DurationModel <- rpart(ride_duration_mins ~ rideable_type + member_casual + distance_miles + start_time_period, data = capital_bikeshare_clean, method = "anova")
+
+```
+*Summary of Duration Model*
+```{r}
+print(summary(DurationModel))
+```
+
+
+
+```{r}
+rpart.plot(DurationModel, type = 3, extra = 1, main = "Regression Tree for Ride Duration Prediction")
+
+```
+Regression tree to predict ride duration in minutes based on rideable_type, member_casual, distance_miles, and start_time_period.
+
+
+- The root node contains all observations, with an average ride duration of 12.7 minutes.
+
+- The first major split occurs at 1.55 miles for distance_miles. This results in two main branches:
+
+  - For distances less than 1.55 miles, the average ride duration is 9.86 minutes.
+  - For distances greater than or equal to 1.55 miles, the average ride duration increases to 20.7 minutes.
+  
+Key Predictors:
+
+Distance is the primary factor influencing ride duration, with significant splits at 0.871 miles and 2.46 miles.
+Rideable type and member status also significantly affect ride duration:
+Members tend to have shorter ride durations than casual riders, especially for shorter distances.
+Electric bikes are associated with shorter ride durations compared to classic bikes.
+
+
+For trips with distance_miles < 0.871 and member status = member, the ride duration averages 6.96 minutes.
+For casual riders with distance_miles < 0.871, the average ride duration is 10.90 minutes.
+For trips with distance_miles ≥ 0.871 and < 2.46, the average duration is 12.6 minutes. Here, electric bike rides average 11.0 minutes, and classic bike rides average 15.2 minutes.
+For longer trips with distance_miles ≥ 2.46, the ride duration increases further to 25.8 minutes, with electric bike rides averaging 23.6 minutes and classic bike rides averaging 32.4 minutes.
+Model Performance:
+
+The model effectively splits based on the most significant predictors, with the tree having 8 terminal nodes.
+
+```{r}
+library(rattle)
+# Build a tree for member_casual
+Member_casual_tree <- rpart(member_casual~ rideable_type + distance_miles + ride_duration_mins + start_time_period, data = capital_bikeshare_clean, method = "class")
+
+# Plot the tree
+tree_vis <- rpart.plot(Member_casual_tree, type = 3, extra = 1, main = "Classification Tree for Member vs Casual Prediction")
+
+# Print the tree
+tree_vis
+
+# Print the summary of the tree
+printcp(Member_casual_tree)
+
+# K-fold 
+fold <- floor(runif(nrow(capital_bikeshare_clean),1,11)) 
+  capital_bikeshare_clean$fold <- fold
+## the test set is just the first fold 
+test.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold == 1,] 
+##exclude the first fold from the data here 
+train.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold != 1,]
+treefit_fold <- rpart(member_casual~ rideable_type + distance_miles + ride_duration_mins + start_time_period, data = capital_bikeshare_clean, method = "class")
+
+fancyRpartPlot(treefit_fold)
+
+pred <- predict(treefit_fold, test.set) 
+plot(pred,test.set$member_casual, main="Predicted vs. Observed Salary", xlab="Tree Predicted Salary", ylab="Observed Salary")
+treefit_fold_error = sum(pred-test.set$member_casual)^2
+treefit_fold_error <- sum((pred - test.set$member_casual)^2)
+pred <- pred[, 2]  # Convert matrix to vector
+treefit_fold_error <- sum((pred - test.set$member_casual)^2)
+print(treefit_fold_error)
+
+
+
+
+
+```
+
+
+```{r}
+library(rattle)
+fancyRpartPlot(DurationModel)
+```
+
+
+```{r}
+print(DurationModel$cptable)
+```
+From this table:
+
+The lowest xerror occurs at cp = 0.0100, where xerror is 0.689.
+However, the xerror is very close between cp = 0.0102 (0.697) and cp = 0.0100 (0.689). The difference is very small, suggesting that the improvement in error with cp = 0.0100 is marginal.
+```{r}
+plotcp(DurationModel)
+```
+
+Cross- validation:
+
+```{r, results="markup"}
+fold <- floor(runif(nrow(capital_bikeshare_clean),1,11)) 
+capital_bikeshare_clean$fold <- fold
+## the test set is just the first fold 
+test.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold == 1,] 
+##exclude the first fold from the data here 
+train.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold != 1,]
+DurationModel_fold <- rpart(ride_duration_mins ~ rideable_type + member_casual +distance_miles + start_time_period, data=train.set, method="anova" )
+fancyRpartPlot(DurationModel_fold)
+```
+
+```{r}
+pred <- predict(DurationModel_fold, test.set) 
+plot(pred,test.set$ride_duration_mins, main="Predicted vs. Observed ride_duration_mins", xlab="Tree Predicted ride_duration_mins", ylab="Observed ride_duration_mins")
+treefit_fold_error = sum(pred-test.set$ride_duration_mins)^2
+print(treefit_fold_error)
+```
+The tree fold error is too large.
+
+now considering only `rideable_type`, `member_casual`, `start_time_period`.
+```{r, results="markup"}
+DurationModel_fold2 <- rpart(ride_duration_mins ~ rideable_type + member_casual  + start_time_period, data=train.set, method="anova" )
+fancyRpartPlot(DurationModel_fold2)
+```
+
+```{r}
+pred2 <- predict(DurationModel_fold2, test.set) 
+plot(pred2,test.set$ride_duration_mins, main="Predicted vs. Observed ride_duration_mins", xlab="Tree Predicted ride_duration_mins", ylab="Observed ride_duration_mins")
+treefit_fold_error2 = sum(pred2-test.set$ride_duration_mins)^2
+print(treefit_fold_error2)
+```
+
+
+The tree fold error is reduced  but still is large. But given that the test data is `r nrow(test.set)` the average error per prediction is `r treefit_fold_error2/nrow(test.set)`.
+
+```{r}
+summary(DurationModel_fold2)
+```
+
+To predict for a new data.
+
+```{r}
+new_data <- data.frame(
+  rideable_type = factor("electric_bike"),
+  member_casual = factor("casual"),
+  start_time_period = factor("Morning")
+)
+
+# Predict the ride duration
+predicted_duration <- predict(DurationModel_fold2, new_data)
+predicted_duration
+```
+
+
