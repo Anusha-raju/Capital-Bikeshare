@@ -69,7 +69,7 @@ colnames(capital_bikeshare)
 There are data points where information like start_station_name & id , end_station_name & id , and end_lat and end_lng are missing. 
 `r colSums(is.na(capital_bikeshare))`.
 
-Dropping the `r colSums(is.na(capital_bikeshare))["end_lat"]` rows as they consitute only `r colSums(is.na(capital_bikeshare))["end_lat"]/nrow(capital_bikeshare)*100` percent of the dataset.
+Dropping the `r colSums(is.na(capital_bikeshare))["end_lat"]` rows as they consitute only `r colSums(is.na(capital_bikeshare))["end_lat"]/nrow(capital_bikeshare)*100` percent of the dataset. 
 
 ```{r}
 capital_bikeshare <- capital_bikeshare %>%
