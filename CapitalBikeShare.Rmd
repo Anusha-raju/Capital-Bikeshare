@@ -444,3 +444,55 @@ predicted_duration
 ```
 
 
+```{r}
+rideable_typeLogit <- glm(rideable_type ~ member_casual + distance_miles + ride_duration_mins + start_time_period, data = capital_bikeshare_clean, family = "binomial")
+
+summary(rideable_typeLogit)
+```
+The logistic regression model shows that several factors significantly influence the `rideable_type.` The coefficient for `member_casualmember` indicates that `members` are less likely to use the specified `rideable_type` compared to `casual` users. `Distance_miles` has a positive impact, suggesting that longer rides are more likely to use this `rideable_type`, while `ride_duration_mins` negatively affects the likelihood. Among the time periods, Early Morning, Night, and Late Evening show higher log-odds compared to other periods like Morning, Mid-Morning, and Evening, which have lower log-odds. The model’s residual deviance (899759) is much lower than the null deviance (933757), indicating a good fit. 
+
+```{r}
+rideable_typeModel <- rpart(rideable_type ~ ride_duration_mins+member_casual + distance_miles + start_time_period, data = capital_bikeshare_clean, method = "class")
+print(summary(rideable_typeModel))
+```
+
+```{r}
+rpart.plot(rideable_typeModel, type = 3, extra = 1, main = "Classification Tree for Rideable type Prediction")
+```
+```{r}
+print(rideable_typeModel$cptable)
+```
+
+```{r}
+plotcp(rideable_typeModel)
+```
+
+```{r, results="markup"}
+fold <- floor(runif(nrow(capital_bikeshare_clean),1,11)) 
+capital_bikeshare_clean$fold <- fold
+## the test set is just the first fold 
+test.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold == 1,] 
+##exclude the first fold from the data here 
+train.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold != 1,]
+rideable_typeModel_fold <- rpart(rideable_type ~ ride_duration_mins+member_casual + distance_miles + start_time_period, data=train.set, method="class" )
+fancyRpartPlot(rideable_typeModel_fold)
+```
+
+
+```{r}
+pred <- predict(rideable_typeModel_fold, test.set) 
+plot(pred,test.set$rideable_type, main="Predicted vs. Observed rideable_type", xlab="Tree classified rideable_type", ylab="Observed rideable_type")
+treefit_fold_error = sum(pred-test.set$rideable_type)^2
+print(treefit_fold_error)
+```
+
+
+```{r}
+library(caret) 
+cm = confusionMatrix( predict(rideable_typeModel, type = "class"), reference = capital_bikeshare_clean[, "rideable_type"] )
+print('Overall: ')
+cm$overall
+print('Class: ')
+cm$byClass
+
+```
