@@ -276,4 +276,23 @@ ggplot(user_bike_counts, aes(x = rideable_type, y = Freq, fill = member_casual))
 - Electric bikes have a higher proportion of member-type riders compared to casual-type riders.
 
 
+## Ride characteristics on weekdays vs weekends
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = day_type, fill = interaction(member_casual, rideable_type))) +
+  geom_bar(position = "dodge") + 
+  labs(title = "Ride characteristics on weekdays vs weekends",
+       x = "Day Type",
+       y = "Count",
+       fill = "Member Type & Rideable Type") +
+  theme_minimal()
+```
+- Overall, there are fewer rides on weekends, with a significant decrease in rides by member-type users during the weekend.
+
+
+# Modelling
+
+
+
+
+
 
