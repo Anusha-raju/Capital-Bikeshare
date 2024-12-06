@@ -190,7 +190,8 @@ ggplot(bike_type_df, aes(x = Var1, y = Freq, fill = Var1)) +
        x = "Bike Type",
        y = "Frequency of Rentals") + 
   scale_fill_manual(values = c("electric_bike" = "violet", "classic_bike" = "lightblue")) +  
-  theme_minimal()
+  scale_y_continuous(labels = scales::comma) +
+  theme(legend.position = "none")
 ```
 
 - The higher frequency of electric bike rentals compared to classic bikes in the dataset indicates a preference for electric bikes. 
@@ -206,6 +207,18 @@ ggplot(capital_bikeshare_clean, aes(x = ride_duration_mins, fill = rideable_type
        y = "Density") +
   scale_fill_manual(values = c("electric_bike" = "red", "classic_bike" = "green")) +  
   theme_minimal()
+
+ggplot(capital_bikeshare_clean, aes(x = ride_duration_mins, fill = rideable_type)) +
+  geom_histogram(binwidth = 2, color = "black", alpha = 0.7, position = "dodge") +
+  labs(
+    title = "Distribution of Ride Duration by Bike Type",
+    x = "Ride Duration (Minutes)",
+    y = "Frequency"
+  ) +
+  scale_fill_manual(values = c("electric_bike" = "pink", "classic_bike" = "red")) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal()
+
 ```
 Box plot
 ```{r}
