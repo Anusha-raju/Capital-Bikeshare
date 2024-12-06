@@ -1,0 +1,158 @@
+---
+title: "Analysis and modelling on the Capital Bikeshare data"
+author: "[Anusha Umashankar](https://github.com/Anusha-raju)| [Aidan Carlisle](https://github.com/acarlisle8)| [Rachel Thomas](https://github.com/releered)| [Sayan Patra](https://github.com/Sayanpatraa) - Group 8 "
+# date: "today"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    number_sections: false
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+<style>
+
+h1 { color: #800000; }  
+
+h2 { color: #000080; } 
+h3 { color: #004d4d; } 
+
+</style>
+
+```{r init, include=F}
+# The package "ezids" (EZ Intro to Data Science) includes a lot of the helper functions we developed for the course. 
+# Some of the frequently used functions are loadPkg(), xkabledply(), xkablesummary(), uzscale(), etc.
+# Once installed, load the library.
+library(ezids)
+```
+
+```{r setup, include=FALSE}
+# some of common options (and the defaults) are: 
+# include=T, eval=T, echo=T, results='hide'/'asis'/'markup',..., collapse=F, warning=T, message=T, error=T, cache=T, fig.width=6, fig.height=4, fig.dim=c(6,4) #inches, fig.align='left'/'center','right', 
+knitr::opts_chunk$set(warning = F, results = "markup", message = F)
+options(scientific=T, digits = 3) 
+```
+
+```{r include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(geosphere)
+library(tidygeocoder)
+library(caret)
+library(lattice)
+library(lubridate)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+library(car)
+library(pROC)
+library(rattle)
+library(caret) 
+```
+
+
+```{r}
+file_path <- file.path(getwd(), "202410-capitalbikeshare-tripdata.csv")
+capital_bikeshare <- read.csv(file_path, header = TRUE)
+```
+
+The dataset contains the following attributes.
+```{r}
+colnames(capital_bikeshare)
+```
+
+# Preprocessing:
+
+1. There are data points where information like start_station_name & id , end_station_name & id , and end_lat and end_lng are missing. 
+`r colSums(is.na(capital_bikeshare))`.
+
+Dropping the `r colSums(is.na(capital_bikeshare))["end_lat"]` rows as they consistute only `r colSums(is.na(capital_bikeshare))["end_lat"]/nrow(capital_bikeshare)*100` percent of the dataset. 
+
+```{r}
+capital_bikeshare <- capital_bikeshare %>%
+  filter(!is.na(end_lat))
+```
+2. `Distance (in miles)` is derived using the latitude and longitude coordinates of the start and end points. The `distVincentySphere()` function from the `geosphere` package in R is used to compute the geodesic distance, factoring in the Earth's curvature.
+
+```{r}
+# Calculate the distance for each row and add it as a new column (in miles)
+capital_bikeshare$distance_miles <- mapply(function(lat1, lon1, lat2, lon2) {
+  distVincentySphere(c(lon1, lat1), c(lon2, lat2)) / 1000 * 0.621371  
+}, capital_bikeshare$start_lat, capital_bikeshare$start_lng, capital_bikeshare$end_lat, capital_bikeshare$end_lng)
+```
+3. Calculated the total ride time by subtracting `started_at` from `ended_at.`
+```{r}
+capital_bikeshare$started_at <- as.POSIXct(capital_bikeshare$started_at, format="%Y-%m-%d %H:%M:%OS")
+capital_bikeshare$ended_at <- as.POSIXct(capital_bikeshare$ended_at, format="%Y-%m-%d %H:%M:%OS")
+capital_bikeshare$ride_duration_mins <- as.numeric(difftime(capital_bikeshare$ended_at, capital_bikeshare$started_at, units = "mins"))
+```
+4. Categorizing Rides by Time Period.
+```{r}
+get_time_period <- function(time) {
+  hour <- as.numeric(format(time, "%H"))
+  
+  if (hour >= 4 & hour < 6) {
+    return("Early Morning")
+  } else if (hour >= 6 & hour < 9) {
+    return("Morning")
+  } else if (hour >= 9 & hour < 12) {
+    return("Mid-Morning")
+  } else if (hour >= 12 & hour < 13) {
+    return("Midday")
+  } else if (hour >= 13 & hour < 17) {
+    return("Afternoon")
+  } else if (hour >= 17 & hour < 19) {
+    return("Evening")
+  } else if (hour >= 19 & hour < 21) {
+    return("Late Evening")
+  } else {
+    return("Night")
+  }
+}
+
+
+capital_bikeshare <- capital_bikeshare %>%
+  mutate(
+    start_time_period = sapply(started_at, get_time_period),
+  )
+```
+5. Categorizing rides by weekday vs weekend
+```{r}
+capital_bikeshare$day_type <- ifelse(wday(capital_bikeshare$started_at) %in% c(1, 7), "weekend", "weekday")
+
+```
+
+
+**The following attributes are considered for further Exploratory Data Analysis (EDA):**
+
+```{r}
+filtered_capital_bikeshare <- capital_bikeshare %>% select(rideable_type,member_casual,distance_miles,ride_duration_mins, start_time_period,day_type)
+```
+
+*Factorizing 'rideable_type', 'member_casual', 'start_time_period', and 'day_type' variables:*
+```{r}
+filtered_capital_bikeshare$rideable_type <- as.factor(filtered_capital_bikeshare$rideable_type) 
+filtered_capital_bikeshare$member_casual <- as.factor(filtered_capital_bikeshare$member_casual)
+filtered_capital_bikeshare$start_time_period <- as.factor(filtered_capital_bikeshare$start_time_period)
+filtered_capital_bikeshare$day_type <- as.factor(filtered_capital_bikeshare$day_type)
+```
+
+*Removing outliers*
+```{r}
+#for distance_miles
+z_scores_DM <- scale(filtered_capital_bikeshare$distance_miles)
+outliers <- which(abs(z_scores_DM) > 3)
+capital_bikeshare_clean <- filtered_capital_bikeshare[-outliers, ]
+
+# for ride_duration_mins
+z_scores_RDM <- scale(capital_bikeshare_clean$ride_duration_mins)
+outliers <- which(abs(z_scores_RDM) > 2)
+capital_bikeshare_clean <- capital_bikeshare_clean[-outliers, ]
+
+```
+
+After cleaning the dataset the number of rows are `r nrow(capital_bikeshare_clean)`.
+
