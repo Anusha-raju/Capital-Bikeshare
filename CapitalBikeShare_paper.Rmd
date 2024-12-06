@@ -156,3 +156,51 @@ capital_bikeshare_clean <- capital_bikeshare_clean[-outliers, ]
 
 After cleaning the dataset the number of rows are `r nrow(capital_bikeshare_clean)`.
 
+# Visualizations:
+*1. Frequency of electric bike versus classic bike rentals*
+```{r}
+
+bike_type_counts <- table(capital_bikeshare_clean$rideable_type)
+bike_type_df <- as.data.frame(bike_type_counts)
+
+ggplot(bike_type_df, aes(x = Var1, y = Freq, fill = Var1)) + 
+  geom_bar(stat = "identity") + 
+  labs(title = "Frequency of Electric Bike vs Classic Bike Rentals",
+       x = "Bike Type",
+       y = "Frequency of Rentals") + 
+  scale_fill_manual(values = c("electric_bike" = "violet", "classic_bike" = "lightblue")) +  
+  scale_y_continuous(labels = scales::comma)+
+  theme(legend.position = "none")
+```
+
+- The higher frequency of electric bike rentals compared to classic bikes in the dataset indicates a preference for electric bikes. 
+
+*2. Distribution of duration rides on electric bike versus classic bike*
+
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = ride_duration_mins, fill = rideable_type)) +
+  geom_histogram(binwidth = 2, color = "black", alpha = 0.7, position = "dodge") +
+  labs(
+    title = "Distribution of Ride Duration by Bike Type",
+    x = "Ride Duration (Minutes)",
+    y = "Frequency"
+  ) +
+  scale_fill_manual(values = c("electric_bike" = "pink", "classic_bike" = "red")) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal()
+```
+
+Box plot
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = rideable_type, y = ride_duration_mins, fill = rideable_type)) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Ride Durations for Electric vs Classic Bikes",
+       x = "Bike Type",
+       y = "Ride Duration (minutes)") +
+  scale_fill_manual(values = c("electric_bike" = "blue", "classic_bike" = "green")) +
+  theme_minimal()
+```
+
+- The distribution of ride duration by bike type is right-skewed, and the box plot highlights a significant number of extreme outliers.
+
+
