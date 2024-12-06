@@ -157,7 +157,7 @@ capital_bikeshare_clean <- capital_bikeshare_clean[-outliers, ]
 After cleaning the dataset the number of rows are `r nrow(capital_bikeshare_clean)`.
 
 # Visualizations:
-*1. Frequency of electric bike versus classic bike rentals*
+## 1. Frequency of electric bike versus classic bike rentals
 ```{r}
 
 bike_type_counts <- table(capital_bikeshare_clean$rideable_type)
@@ -168,15 +168,16 @@ ggplot(bike_type_df, aes(x = Var1, y = Freq, fill = Var1)) +
   labs(title = "Frequency of Electric Bike vs Classic Bike Rentals",
        x = "Bike Type",
        y = "Frequency of Rentals") + 
-  scale_fill_manual(values = c("electric_bike" = "violet", "classic_bike" = "lightblue")) +  
+  scale_fill_manual(values = c("electric_bike" = "blue", "classic_bike" = "green")) +  
   scale_y_continuous(labels = scales::comma)+
   theme(legend.position = "none")
 ```
 
 - The higher frequency of electric bike rentals compared to classic bikes in the dataset indicates a preference for electric bikes. 
 
-*2. Distribution of duration rides on electric bike versus classic bike*
+## 2. Distribution of duration rides on electric bike versus classic bike
 
+*Histogram*
 ```{r}
 ggplot(capital_bikeshare_clean, aes(x = ride_duration_mins, fill = rideable_type)) +
   geom_histogram(binwidth = 2, color = "black", alpha = 0.7, position = "dodge") +
@@ -185,12 +186,12 @@ ggplot(capital_bikeshare_clean, aes(x = ride_duration_mins, fill = rideable_type
     x = "Ride Duration (Minutes)",
     y = "Frequency"
   ) +
-  scale_fill_manual(values = c("electric_bike" = "pink", "classic_bike" = "red")) +
+  scale_fill_manual(values = c("electric_bike" = "green", "classic_bike" = "blue")) +
   scale_y_continuous(labels = scales::comma) +
   theme_minimal()
 ```
 
-Box plot
+*Box plot*
 ```{r}
 ggplot(capital_bikeshare_clean, aes(x = rideable_type, y = ride_duration_mins, fill = rideable_type)) +
   geom_boxplot() +
@@ -202,5 +203,77 @@ ggplot(capital_bikeshare_clean, aes(x = rideable_type, y = ride_duration_mins, f
 ```
 
 - The distribution of ride duration by bike type is right-skewed, and the box plot highlights a significant number of extreme outliers.
+
+
+## Distribution of distances ride by bike type. 
+
+*Histogram*
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = distance_miles, fill = rideable_type)) +
+  geom_histogram(binwidth = 0.3, color = "black", alpha = 0.7, position = "dodge") +
+  labs(
+    title = "Distribution of Ride Distance by Bike Type",
+    x = "Ride Distance (miles)",
+    y = "Frequency"
+  ) +
+  scale_fill_manual(values = c("electric_bike" = "blue", "classic_bike" = "green")) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal()
+```
+*Box-plot*
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = rideable_type, y = distance_miles, fill = rideable_type)) +
+  geom_boxplot() +
+  labs(
+    title = "Box Plot of Ride Distance by Bike Type",
+    x = "Rideable Type",
+    y = "Distance (miles)"
+  ) +
+  scale_fill_manual(values = c("electric_bike" = "blue", "classic_bike" = "green")) + 
+  theme_minimal()
+```
+
+
+- The distribution of ride distance by bike type is slightly more right-skewed for classic bikes compared to electric bikes, with electric bikes exhibiting a wider distribution than classic bikes.
+
+
+## Frequency of user types
+```{r}
+user_type_counts <- table(capital_bikeshare_clean$member_casual)
+user_type_df <- as.data.frame(user_type_counts)
+ggplot(user_type_df, aes(x = "", y = Freq, fill = User_Type)) +
+  geom_bar(stat = "identity", width = 1) + 
+  coord_polar(theta = "y") + 
+  labs(title = "Proportion of User Types (Member vs Casual)") +
+  scale_fill_manual(values = c("member" = "blue", "casual" = "green")) +
+  theme_void() +
+  geom_text(aes(label = paste0(round(Freq/sum(Freq)*100, 1), "%")), 
+            position = position_stack(vjust = 0.5), color = "black") 
+```
+
+- There is a significantly higher number of member-type riders in October.
+
+
+
+## User Types by Rideable Type
+
+```{r}
+user_bike_counts <- capital_bikeshare_clean %>%
+  group_by(member_casual, rideable_type) %>%
+  summarise(Freq = n())  
+
+ggplot(user_bike_counts, aes(x = rideable_type, y = Freq, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "dodge") +  
+  labs(title = "User Type Distribution by Rideable Type",
+       x = "Rideable Type (Bike Type)",
+       y = "Frequency of Rides") +
+  scale_fill_manual(values = c("member" = "blue", "casual" = "green")) +  
+  theme_minimal() +
+  scale_y_continuous(labels = scales::comma)
+```
+
+
+- Electric bikes have a higher proportion of member-type riders compared to casual-type riders.
+
 
 
