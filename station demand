@@ -1,0 +1,51 @@
+library(dplyr)
+library(lubridate)
+
+# Load and preprocess the data
+bikeshare_data <- read.csv("202410-capitalbikeshare-tripdata.csv") %>%
+  mutate(
+    started_at = ymd_hms(started_at),
+    ended_at = ymd_hms(ended_at),
+    start_hour = hour(started_at),
+    day_of_week = wday(started_at, label = TRUE, abbr = TRUE),
+    ride_duration = as.numeric(difftime(ended_at, started_at, units = "mins")),
+    member_casual = factor(member_casual, levels = c("casual", "member")),
+    high_demand_station = as.numeric(end_station_name %in% 
+                                     names(sort(table(end_station_name), decreasing = TRUE)[1:10]))
+  ) %>%
+  filter(ride_duration > 0 & ride_duration <= 1440) # Filter invalid durations
+
+# Train-test split
+set.seed(123)
+train_index <- sample(seq_len(nrow(bikeshare_data)), size = 0.7 * nrow(bikeshare_data))
+train_data <- bikeshare_data[train_index, ]
+test_data <- bikeshare_data[-train_index, ]
+
+# Logistic regression model
+logit_model <- glm(
+  high_demand_station ~ start_station_name + ride_duration + start_hour + 
+    day_of_week + member_casual + rideable_type,
+  family = binomial(link = "logit"),
+  data = train_data
+)
+
+# Model summary
+summary(logit_model)
+
+# Predict on test data
+test_data$predicted_probs <- predict(logit_model, newdata = test_data, type = "response")
+test_data$predicted_class <- ifelse(test_data$predicted_probs > 0.5, 1, 0)
+
+# Model evaluation
+library(caret)
+confusion_matrix <- confusionMatrix(
+  factor(test_data$predicted_class, levels = c(0, 1)),
+  factor(test_data$high_demand_station)
+)
+print(confusion_matrix)
+
+# Variable importance
+library(DALEX)
+explainer <- explain(logit_model, data = train_data, y = train_data$high_demand_station, label = "High Demand Station Model")
+vi <- variable_importance(explainer)
+plot(vi)
