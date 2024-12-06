@@ -42,12 +42,23 @@ library(ggplot2)
 library(tidyr)
 library(geosphere)
 library(tidygeocoder)
+library(caret)
+library(lattice)
+library(lubridate)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+library(car)
+library(pROC)
 ```
 
 
 
+capital_bikeshare <- X202410_capitalbikeshare_tripdata
+
+
 ```{r}
-file_path <- file.path(getwd(), "202410-capitalbikeshare-tripdata.csv")
+file_path <- file.path(getwd(), "X202410_capitalbikeshare_tripdata.csv")
 capital_bikeshare <- read.csv(file_path, header = TRUE)
 ```
 
@@ -62,7 +73,7 @@ colnames(capital_bikeshare)
 There are data points where information like start_station_name & id , end_station_name & id , and end_lat and end_lng are missing. 
 `r colSums(is.na(capital_bikeshare))`.
 
-Dropping the `r colSums(is.na(capital_bikeshare))["end_lat"]` rows as they consitute only `r colSums(is.na(capital_bikeshare))["end_lat"]/nrow(capital_bikeshare)*100` percent of the dataset.
+Dropping the `r colSums(is.na(capital_bikeshare))["end_lat"]` rows as they consitute only `r colSums(is.na(capital_bikeshare))["end_lat"]/nrow(capital_bikeshare)*100` percent of the dataset. 
 
 ```{r}
 capital_bikeshare <- capital_bikeshare %>%
@@ -125,19 +136,27 @@ capital_bikeshare <- capital_bikeshare %>%
   )
 ```
 
+6. Categorizing rides by weekday vs weekend
+```{r}
+capital_bikeshare$day_type <- ifelse(wday(capital_bikeshare$started_at) %in% c(1, 7), "weekend", "weekday")
+
+```
+
+
 
 **The following attributes are considered for further Exploratory Data Analysis (EDA):**
 
 ```{r}
 #filtered_capital_bikeshare <- capital_bikeshare %>% select(rideable_type,member_casual,distance_miles,ride_duration_mins, start_time_period, start_addy, end_addy)
-filtered_capital_bikeshare <- capital_bikeshare %>% select(rideable_type,member_casual,distance_miles,ride_duration_mins, start_time_period)
+filtered_capital_bikeshare <- capital_bikeshare %>% select(rideable_type,member_casual,distance_miles,ride_duration_mins, start_time_period,day_type)
 ```
 
-*Factorizing `rideable_type`, `member_casual` and `start_time_period` variables:*
+*Factorizing 'rideable_type', 'member_casual', 'start_time_period', and 'day_type' variables:*
 ```{r}
 filtered_capital_bikeshare$rideable_type <- as.factor(filtered_capital_bikeshare$rideable_type) 
 filtered_capital_bikeshare$member_casual <- as.factor(filtered_capital_bikeshare$member_casual)
 filtered_capital_bikeshare$start_time_period <- as.factor(filtered_capital_bikeshare$start_time_period)
+filtered_capital_bikeshare$day_type <- as.factor(filtered_capital_bikeshare$day_type)
 ```
 
 *Removing outliers*
@@ -254,83 +273,131 @@ ggplot(user_bike_counts, aes(x = rideable_type, y = Freq, fill = member_casual))
   theme_minimal()
 ```
 
+*5. Member vs Casual bike usage on weekdays vs weekends*
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = day_type, fill = interaction(member_casual, rideable_type))) +
+  geom_bar(position = "dodge") + # Dodged bars for separate member_casual and rideable_type combinations
+  labs(title = "Rides by Day Type (Weekday vs Weekend)",
+       x = "Day Type",
+       y = "Count",
+       fill = "Member Type & Rideable Type") +
+  theme_minimal()
+```
+
 # Predict the rider's class based on trip characteristics
 ```{r}
-riderLogit <- glm(member_casual ~ rideable_type + distance_miles + ride_duration_mins + start_time_period, data = capital_bikeshare_clean, family = "binomial")
+riderLogit01 <- glm(member_casual ~ ride_duration_mins, data = capital_bikeshare_clean, family = "binomial")
+summary(riderLogit01)
 
-summary(riderLogit)
+riderLogit02 <- glm(member_casual ~ rideable_type + ride_duration_mins, data = capital_bikeshare_clean, family = "binomial")
+summary(riderLogit02)
+
+riderLogit03 <- glm(member_casual ~ rideable_type + ride_duration_mins + day_type, data = capital_bikeshare_clean, family = "binomial")
+summary(riderLogit03)
+
+riderLogit04 <- glm(member_casual ~ rideable_type + distance_miles + ride_duration_mins + day_type, data = capital_bikeshare_clean, family = "binomial")
+summary(riderLogit04)
+
+riderLogit05 <- glm(member_casual ~ rideable_type * ride_duration_mins, data = capital_bikeshare_clean, family = "binomial")
+summary(riderLogit05)
+
+riderLogit06 <- glm(member_casual ~ rideable_type * ride_duration_mins * day_type, data = capital_bikeshare_clean, family = "binomial")
+summary(riderLogit06)
+
+riderLogit07 <- glm(member_casual ~ rideable_type * distance_miles * ride_duration_mins * day_type, data = capital_bikeshare_clean, family = "binomial")
+summary(riderLogit07)
+
+riderLogit08 <- glm(member_casual ~ rideable_type * distance_miles * ride_duration_mins * day_type * start_time_period, data = capital_bikeshare_clean, family = "binomial")
+summary(riderLogit08)
+
+riderLogit09 <- glm(member_casual ~ rideable_type + distance_miles + ride_duration_mins + start_time_period + day_type, data = capital_bikeshare_clean, family = "binomial")
+summary(riderLogit09)
+
+riderLogit10 <- glm(member_casual ~ rideable_type * ride_duration_mins + distance_miles + start_time_period + day_type, data = capital_bikeshare_clean, family = "binomial")
+summary(riderLogit10)
 ```
 
-Electric bike reduces the log-odds of being a member compared to a classic bike.
-Electric scooter strongly reduces the log-odds of being a member compared to the classic bike.
-Positive distance coefficient indicates longer distances increase the likelihood of being a member.
-Negative duration coefficition indicates that longer rides decrease the likelihood of being a member.
-Evening, Late evening, Mid-morning, and Morning increase the log-odds of being a member. Night decreases the log odds of being a member. 
-Early morning and midday are not statistically significant.
+ANOVA to compare models and select the best
+```{r}
+anova_result <- anova(riderLogit01, riderLogit02, riderLogit03, riderLogit04, riderLogit05, riderLogit06, riderLogit07, riderLogit08, riderLogit09, test = "Chisq")
+print(anova_result)
+
+anova_result <- anova(riderLogit04, riderLogit09, test = "Chisq")
+print(anova_result)
+
+anova_result <- anova(riderLogit09, riderLogit10, test = "Chisq")
+print(anova_result)
+```
 
 ```{r}
-exp(coef(riderLogit))
+
+vif(riderLogit06)
+vif(riderLogit04)
+vif(riderLogit09)
+vif(riderLogit10)
 ```
+
+All models are statistically significant. Models 8, and 9 the lowest residual deviance, but introduce significant complexity indicated by the extremely high degrees of freedom, likely overfitting. Models 6 and 7 both show a substantive improvement in deviance, though 6 has higher deviance reduction for fewer degrees of freedom. Model 6 is likely best fit for balance between fit and complexity. However the VIF for model 6 shows that all of the interation terms are collinear. Model 4 is likely the best choce given a statistically significant reduction in deviance and the VIF for Model 4 allows 4 variables that that show complete independence from each other. 
+
+Model 10 - member_casual ~ rideable_type * ride_duration_mins + distance_miles + start_time_period + day_type
+```{r}
+riderLogit10 <- glm(member_casual ~ rideable_type * ride_duration_mins + distance_miles + start_time_period + day_type, data = capital_bikeshare_clean, family = "binomial")
+summary(riderLogit10)
+```
+Electric bike reduces the log-odds of being a member compared to a classic bike.
+Positive distance coefficient indicates longer distances increase the likelihood of being a member.
+Negative duration coefficient indicates that longer rides decrease the likelihood of being a member.
+Evening, Late evening, Mid-morning, Morning increase the log-odds of being a member. 
+Early morning, midday, and Night are not statistically significant.
+
+
+```{r}
+exp(coef(riderLogit10))
+```
+
 
 The odds of being a member (the intercept) is 2.78 times higher than being a casual rider.
-The OR for electric bike is 0.88, meaning the odds of being a member are about 12% lower (1-0.88) for electric bike users compared to classic bike.
-The OR for electric scooter is 0.07, meaning the odds of bing a member are about 93% lower (1-0.07) for electric scooter users compared to classic bike.
-The OR for distance is 1.2126, meaning each additional mile traveled increased the odds of being a member by 21.26%.
-The OR for duration is 0.9570, meaning each additional minute of ride duration decreases the odds of the being a member by 4.3% (1-0.9570).
-The OR for early morning is 0.9767, meaning rides starting during that time period have a 2.33% (1-0.9767) lower odds of being a member compared to afternoon (the reference period).
-The OR for evening is 1.1349, meaning rides starting in the evening have 13.49% higher odds of being a member compared to the afternoon.
-The OR for Late evening is 1.1025, meaning rides starting in the late evening have a 10.25% higher odds of being a member compared to the afternoon.
-The OR for mid-morning is 1.0743, meaning these rides have 7.43% higher odds of being a member.
-The OR for Midday is 1.0063, meaning these rides have 0.63% higher odds of being a member.
-The OR for morning is 1.6012, meaning morning rides have 60% higher odds of being a member.
-The OR for Night is 0.9571, meaning night rides have 4.29% lower odds of being a member.
 
-Members are more likely to use classic bikes. take longer rides, ride for shorter duration, and are most associated with morning and evening rides.
+
 
 ```{r}
-predicted <- ifelse(predict(riderLogit, type = "response") > 0.5, "member", "casual")
-conf_matrix <- table(Predicted = predicted, Actual = capital_bikeshare_clean$member_casual)
-TP <- conf_matrix[2, 2] 
-TN <- conf_matrix[1, 1]  
-FP <- conf_matrix[1, 2]  
-FN <- conf_matrix[2, 1]  
-accuracy <- (TP + TN) / (TP + TN + FP + FN)  
+predicted_probs <- predict(riderLogit10, type = "response")
+
+# Classify based on a threshold of 0.5
+predicted_classes <- ifelse(predicted_probs > 0.5, "member", "casual")
+predicted_classes <- factor(predicted_classes, levels = c("member", "casual"))
+actual_classes <- factor(capital_bikeshare_clean$member_casual, levels = c("member", "casual"))
+
+# Create the confusion matrix
+conf_matrix <- confusionMatrix(predicted_classes, actual_classes)
+
+# Print the confusion matrix and statistics
+print(conf_matrix)
+
+# Extract accuracy
+accuracy <- conf_matrix$overall["Accuracy"]
 print(paste("Accuracy:", round(accuracy, 4)))
 ```
 
-This model's accuracy is `r round(accuracy, 4)))` which is not great.
+
+
 
 ```{r}
-library(car)
-vif(riderLogit)
+predicted_probs10 <- predict(riderLogit10, newdata = capital_bikeshare_clean, type = "response")
+roc_curve10 <- roc(response = capital_bikeshare_clean$member_casual, predicted_probs10, levels = c("casual", "member"))
+plot(roc_curve, main = "ROC Curve for Logistic Regression Model", col = "blue", lwd = 2)
+
+auc_value10 <- auc(roc_curve10)
+print(paste("AUC (ModelMetrics):", round(auc_value10, 4)))
+
 ```
 
-The VIF has all variables at nearly 1 which means there is no appreciable multicollinearity.
+
+
+# Model to predict the duration of the ride based on trip characteristics and type of rider.
 
 ```{r}
-riderLogit_stepwise <- step(
-  riderLogit, 
-  direction = "backward"
-)
-```
 
-The AIC is increased by removing any of the predictors, much worse if you remove duration, and much, much worse if you remove rideable_type. So these predictors all contribute meaningfully to the model.
-
-riderLogit_refined <- glm(
-  member_casual ~ rideable_type + distance_miles + ride_duration_mins + 
-    start_time_periodEvening + start_time_periodLate Evening +
-    start_time_periodMid-Morning + start_time_periodMorning + 
-    start_time_periodNight,
-  family = "binomial",
-  data = capital_bikeshare_clean
-)
-
-
-
-Model to predict the duration of the ride based on trip characteristics and type of rider.
-```{r}
-library(rpart)
-library(rpart.plot)
 DurationModel <- rpart(ride_duration_mins ~ rideable_type + member_casual + distance_miles + start_time_period, data = capital_bikeshare_clean, method = "anova")
 
 ```
@@ -372,7 +439,48 @@ Model Performance:
 The model effectively splits based on the most significant predictors, with the tree having 8 terminal nodes.
 
 ```{r}
+
+# Build a tree for member_casual
+Member_casual_tree <- rpart(member_casual~ rideable_type + distance_miles + ride_duration_mins + start_time_period + day_type, data = capital_bikeshare_clean, method = "class")
+
+# Plot the tree
+tree_vis <- rpart.plot(Member_casual_tree, type = 3, extra = 1, main = "Classification Tree for Member vs Casual Prediction")
+
+# Print the tree
+tree_vis
+
+# Print the summary of the tree
+printcp(Member_casual_tree)
+
+# K-fold 
+fold <- floor(runif(nrow(capital_bikeshare_clean),1,11)) 
+  capital_bikeshare_clean$fold <- fold
+## the test set is just the first fold 
+test.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold == 1,] 
+##exclude the first fold from the data here 
+train.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold != 1,]
+treefit_fold <- rpart(member_casual~ rideable_type + distance_miles + ride_duration_mins + start_time_period, day_type, data = capital_bikeshare_clean, method = "class")
+
+fancyRpartPlot(treefit_fold)
+
+pred <- predict(treefit_fold, test.set) 
+plot(pred,test.set$member_casual, main="Predicted vs. Observed Salary", xlab="Tree Predicted Salary", ylab="Observed Salary")
+treefit_fold_error = sum(pred-test.set$member_casual)^2
+treefit_fold_error <- sum((pred - test.set$member_casual)^2)
+pred <- pred[, 2]  # Convert matrix to vector
+treefit_fold_error <- sum((pred - test.set$member_casual)^2)
+print(treefit_fold_error)
+
+
+
+
+
+```
+
+
+```{r}
 library(rattle)
+
 fancyRpartPlot(DurationModel)
 ```
 
@@ -444,6 +552,7 @@ predicted_duration
 ```
 
 
+
 ```{r}
 rideable_typeLogit <- glm(rideable_type ~ member_casual + distance_miles + ride_duration_mins + start_time_period, data = capital_bikeshare_clean, family = "binomial")
 
@@ -496,3 +605,4 @@ print('Class: ')
 cm$byClass
 
 ```
+
