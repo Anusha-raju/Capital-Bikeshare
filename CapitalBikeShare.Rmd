@@ -328,7 +328,14 @@ summary(riderLogit09)
 
 riderLogit10 <- glm(member_casual ~ rideable_type * ride_duration_mins + distance_miles + start_time_period + day_type, data = capital_bikeshare_clean, family = "binomial")
 summary(riderLogit10)
+
+riderLogit11 <- glm(member_casual ~ distance_miles + rideable_type * ride_duration_mins + day_type, data = capital_bikeshare_clean, family = "binomial")
+summary(riderLogit11)
 ```
+AIC10 = 847467
+AIC11 = 849314
+
+
 
 ANOVA to compare models and select the best
 ```{r}
@@ -340,6 +347,15 @@ print(anova_result)
 
 anova_result <- anova(riderLogit09, riderLogit10, test = "Chisq")
 print(anova_result)
+
+anova_result <- anova(riderLogit04, riderLogit11, test = "Chisq")
+print(anova_result)
+
+anova_result <- anova(riderLogit11, riderLogit10, test = "Chisq")
+print(anova_result)
+
+anova_result <- anova(riderLogit04, riderLogit10, test = "Chisq")
+print(anova_result)
 ```
 
 ```{r}
@@ -348,29 +364,37 @@ vif(riderLogit06)
 vif(riderLogit04)
 vif(riderLogit09)
 vif(riderLogit10)
+vif(riderLogit11)
 ```
 
-All models are statistically significant. Models 8, and 9 the lowest residual deviance, but introduce significant complexity indicated by the extremely high degrees of freedom, likely overfitting. Models 6 and 7 both show a substantive improvement in deviance, though 6 has higher deviance reduction for fewer degrees of freedom. Model 6 is likely best fit for balance between fit and complexity. However the VIF for model 6 shows that all of the interation terms are collinear. Model 4 is likely the best choce given a statistically significant reduction in deviance and the VIF for Model 4 allows 4 variables that that show complete independence from each other. 
+Model selection started with duration (ride_duration_mins) only and then added bike type (rideable_type) because the decision tree indicated these were the most important variables (see below). Because this data doesn't have many variables, and nearly all were statistically significant in the full model, we elected a stepwise approach to model building, and used ANOVA to compare model quality. Initially Models 4 and 6 had the best reduction in residual deviance for minimal change in degrees of freedom that was statistically significant. However the VIF for model 6 indicated a significant amount of collinearity. So then we compared model 4 to the full model (9), which showed a smaller but still statistically significant reduction to residual deviance. However this model increased the complexity by 7 degrees of freedom. We tried 2 other versions of the model, incorporating the interaction terms between duration and bike type, but with and without the time-of-day (start_time_period). Model10(riderLogit10) including all variables and the interaction between duration and bike type is a better fit when compared via ANOVA to the model without time-of-day, with a statistically significant reduction in residual deviance.
 
 Model 10 - member_casual ~ rideable_type * ride_duration_mins + distance_miles + start_time_period + day_type
 ```{r}
 riderLogit10 <- glm(member_casual ~ rideable_type * ride_duration_mins + distance_miles + start_time_period + day_type, data = capital_bikeshare_clean, family = "binomial")
 summary(riderLogit10)
 ```
-Electric bike reduces the log-odds of being a member compared to a classic bike.
-Positive distance coefficient indicates longer distances increase the likelihood of being a member.
-Negative duration coefficient indicates that longer rides decrease the likelihood of being a member.
-Evening, Late evening, Mid-morning, Morning increase the log-odds of being a member. 
-Early morning, midday, and Night are not statistically significant.
+
+The intercept is log-odds 1.52, the log-odds of being a member when the bike is a classic, ride duration and distance are 0, it is the afternoon, and it is a weekday.
+Electric bike (verus classic bike) reduces the log-odds of being a member by log-odds 0.631.
+Each additional minute of ride duration decrease the log-odds of being a member by 0.062.
+Each additional mile of distance ridden increases the log-odds of being a member b 0.12
+Evening, Late evening, Mid-morning, Morning increase the log-odds of being a member compared to afternoon. 
+Early morning, midday, and Night are not statistically significant at alpha = 0.05.
+Weekend rides reduce the likelihood of being a member by log-odds 0.42.
+The interaction term indicates that for each additional minute of ride duration on an electric bike, the negative effect of ride duration (see above) on the log-odds of being a member is reduced by 0.04. This means longer rides on electric bikes are less strongly associated with with casual riders on classic bikes.
+
 
 
 ```{r}
 exp(coef(riderLogit10))
 ```
-
-
-The odds of being a member (the intercept) is 2.78 times higher than being a casual rider.
-
+When the log-odds are exponentiated, we can use the odds ratios (OR) to better understand the impact of the variables.
+The intercept is 4.559 meaning the odds of being a member are 4.56 times higher than being a casual user when the bike is a classic, it is a weekday afternoon, and ride duration and distance are 0.
+The odds ratio for electric bike is 0.541, meaning riders on electric bikes are 46% (1-0.541) less likely to be members compared to classic bikes.
+The odds ratio for duraiton is 0.94, meaning each additional minute of ride duration decreases the odds of being a member by 6% (1-0.94).
+The odds ratio for distance is 1.127, meaning each additional mile of distance increases the odds of being a member by 13%.
+The odds ratio for morning rides.
 
 
 ```{r}
@@ -392,7 +416,7 @@ accuracy <- conf_matrix$overall["Accuracy"]
 print(paste("Accuracy:", round(accuracy, 4)))
 ```
 
-
+Logit 10 Accuracy = 0.693
 
 
 ```{r}
@@ -404,6 +428,8 @@ auc_value10 <- auc(roc_curve10)
 print(paste("AUC (ModelMetrics):", round(auc_value10, 4)))
 
 ```
+
+AUC10 = 0.6337
 
 
 
