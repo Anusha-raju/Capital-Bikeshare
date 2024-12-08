@@ -1,0 +1,313 @@
+---
+title: "Analysis and modelling on the Capital Bikeshare data - October 2024"
+author: "[Anusha Umashankar](https://github.com/Anusha-raju)| [Aidan Carlisle](https://github.com/acarlisle8)| [Rachel Thomas](https://github.com/releered)| [Sayan Patra](https://github.com/Sayanpatraa) - Group 8 "
+# date: "today"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    number_sections: false
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+<style>
+
+h1 { color: #800000; }  
+
+h2 { color: #000080; } 
+h3 { color: #004d4d; } 
+
+</style>
+
+```{r init, include=F}
+# The package "ezids" (EZ Intro to Data Science) includes a lot of the helper functions we developed for the course. 
+# Some of the frequently used functions are loadPkg(), xkabledply(), xkablesummary(), uzscale(), etc.
+# Once installed, load the library.
+library(ezids)
+```
+
+```{r setup, include=FALSE}
+# some of common options (and the defaults) are: 
+# include=T, eval=T, echo=T, results='hide'/'asis'/'markup',..., collapse=F, warning=T, message=T, error=T, cache=T, fig.width=6, fig.height=4, fig.dim=c(6,4) #inches, fig.align='left'/'center','right', 
+knitr::opts_chunk$set(warning = F, results = "markup", message = F)
+options(scientific=T, digits = 3) 
+```
+
+```{r include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(geosphere)
+library(tidygeocoder)
+library(caret)
+library(lattice)
+library(lubridate)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+library(car)
+library(pROC)
+library(rattle)
+library(caret) 
+```
+
+# Introduction: 
+
+*Capital Bikeshare* is a bicycle-sharing system that serves Washington, D.C., and certain counties of the larger metropolitan area in both Maryland and Virginia. Users can select from electric or classic bikes at over 700 locations, either as a casual rider or with a monthly membership. The dataset is of October 2024.
+
+
+```{r}
+file_path <- file.path(getwd(), "202410-capitalbikeshare-tripdata.csv")
+capital_bikeshare <- read.csv(file_path, header = TRUE)
+```
+
+The dataset contains the following attributes.
+```{r}
+colnames(capital_bikeshare)
+```
+
+# Preprocessing:
+
+1. There are data points where information like start_station_name & id , end_station_name & id , and end_lat and end_lng are missing. 
+`r colSums(is.na(capital_bikeshare))`.
+
+Dropping the `r colSums(is.na(capital_bikeshare))["end_lat"]` rows as they consistute only `r colSums(is.na(capital_bikeshare))["end_lat"]/nrow(capital_bikeshare)*100` percent of the dataset. 
+
+```{r}
+capital_bikeshare <- capital_bikeshare %>%
+  filter(!is.na(end_lat))
+```
+2. `Distance (in miles)` is derived using the latitude and longitude coordinates of the start and end points. The `distVincentySphere()` function from the `geosphere` package in R is used to compute the geodesic distance, factoring in the Earth's curvature.
+
+```{r}
+# Calculate the distance for each row and add it as a new column (in miles)
+capital_bikeshare$distance_miles <- mapply(function(lat1, lon1, lat2, lon2) {
+  distVincentySphere(c(lon1, lat1), c(lon2, lat2)) / 1000 * 0.621371  
+}, capital_bikeshare$start_lat, capital_bikeshare$start_lng, capital_bikeshare$end_lat, capital_bikeshare$end_lng)
+```
+3. Calculated the total ride time by subtracting `started_at` from `ended_at.`
+```{r}
+capital_bikeshare$started_at <- as.POSIXct(capital_bikeshare$started_at, format="%Y-%m-%d %H:%M:%OS")
+capital_bikeshare$ended_at <- as.POSIXct(capital_bikeshare$ended_at, format="%Y-%m-%d %H:%M:%OS")
+capital_bikeshare$ride_duration_mins <- as.numeric(difftime(capital_bikeshare$ended_at, capital_bikeshare$started_at, units = "mins"))
+```
+4. Categorizing Rides by Time Period.
+```{r}
+get_time_period <- function(time) {
+  hour <- as.numeric(format(time, "%H"))
+  
+  if (hour >= 4 & hour < 6) {
+    return("Early Morning")
+  } else if (hour >= 6 & hour < 9) {
+    return("Morning")
+  } else if (hour >= 9 & hour < 12) {
+    return("Mid-Morning")
+  } else if (hour >= 12 & hour < 13) {
+    return("Midday")
+  } else if (hour >= 13 & hour < 17) {
+    return("Afternoon")
+  } else if (hour >= 17 & hour < 19) {
+    return("Evening")
+  } else if (hour >= 19 & hour < 21) {
+    return("Late Evening")
+  } else {
+    return("Night")
+  }
+}
+
+
+capital_bikeshare <- capital_bikeshare %>%
+  mutate(
+    start_time_period = sapply(started_at, get_time_period),
+  )
+```
+5. Categorizing rides by weekday vs weekend
+```{r}
+capital_bikeshare$day_type <- ifelse(wday(capital_bikeshare$started_at) %in% c(1, 7), "weekend", "weekday")
+
+```
+
+
+**The following attributes are considered for further Exploratory Data Analysis (EDA):**
+
+```{r}
+filtered_capital_bikeshare <- capital_bikeshare %>% select(rideable_type,member_casual,distance_miles,ride_duration_mins, start_time_period,day_type)
+```
+
+*Factorizing 'rideable_type', 'member_casual', 'start_time_period', and 'day_type' variables:*
+```{r}
+filtered_capital_bikeshare$rideable_type <- as.factor(filtered_capital_bikeshare$rideable_type) 
+filtered_capital_bikeshare$member_casual <- as.factor(filtered_capital_bikeshare$member_casual)
+filtered_capital_bikeshare$start_time_period <- as.factor(filtered_capital_bikeshare$start_time_period)
+filtered_capital_bikeshare$day_type <- as.factor(filtered_capital_bikeshare$day_type)
+```
+
+*Removing outliers*
+```{r}
+#for distance_miles
+z_scores_DM <- scale(filtered_capital_bikeshare$distance_miles)
+outliers <- which(abs(z_scores_DM) > 3)
+capital_bikeshare_clean <- filtered_capital_bikeshare[-outliers, ]
+
+# for ride_duration_mins
+z_scores_RDM <- scale(capital_bikeshare_clean$ride_duration_mins)
+outliers <- which(abs(z_scores_RDM) > 2)
+capital_bikeshare_clean <- capital_bikeshare_clean[-outliers, ]
+
+```
+
+After cleaning the dataset the number of rows are `r nrow(capital_bikeshare_clean)`.
+
+# Visualizations:
+## 1. Frequency of electric bike versus classic bike rentals
+```{r}
+
+bike_type_counts <- table(capital_bikeshare_clean$rideable_type)
+bike_type_df <- as.data.frame(bike_type_counts)
+
+ggplot(bike_type_df, aes(x = Var1, y = Freq, fill = Var1)) + 
+  geom_bar(stat = "identity") + 
+  labs(title = "Frequency of Electric Bike vs Classic Bike Rentals",
+       x = "Bike Type",
+       y = "Frequency of Rentals") + 
+  scale_fill_manual(values = c("electric_bike" = "blue", "classic_bike" = "green")) +  
+  scale_y_continuous(labels = scales::comma)+
+  theme(legend.position = "none")
+```
+
+- The higher frequency of electric bike rentals compared to classic bikes in the dataset indicates a preference for electric bikes. 
+
+## 2. Distribution of duration rides on electric bike versus classic bike
+
+*Histogram*
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = ride_duration_mins, fill = rideable_type)) +
+  geom_histogram(binwidth = 2, color = "black", alpha = 0.7, position = "dodge") +
+  labs(
+    title = "Distribution of Ride Duration by Bike Type",
+    x = "Ride Duration (Minutes)",
+    y = "Frequency"
+  ) +
+  scale_fill_manual(values = c("electric_bike" = "green", "classic_bike" = "blue")) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal()
+```
+
+*Box plot*
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = rideable_type, y = ride_duration_mins, fill = rideable_type)) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Ride Durations for Electric vs Classic Bikes",
+       x = "Bike Type",
+       y = "Ride Duration (minutes)") +
+  scale_fill_manual(values = c("electric_bike" = "blue", "classic_bike" = "green")) +
+  theme_minimal()
+```
+
+- The distribution of ride duration by bike type is right-skewed, and the box plot highlights a significant number of extreme outliers.
+
+
+## Distribution of distances ride by bike type. 
+
+*Histogram*
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = distance_miles, fill = rideable_type)) +
+  geom_histogram(binwidth = 0.3, color = "black", alpha = 0.7, position = "dodge") +
+  labs(
+    title = "Distribution of Ride Distance by Bike Type",
+    x = "Ride Distance (miles)",
+    y = "Frequency"
+  ) +
+  scale_fill_manual(values = c("electric_bike" = "blue", "classic_bike" = "green")) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal()
+```
+*Box-plot*
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = rideable_type, y = distance_miles, fill = rideable_type)) +
+  geom_boxplot() +
+  labs(
+    title = "Box Plot of Ride Distance by Bike Type",
+    x = "Rideable Type",
+    y = "Distance (miles)"
+  ) +
+  scale_fill_manual(values = c("electric_bike" = "blue", "classic_bike" = "green")) + 
+  theme_minimal()
+```
+
+
+- The distribution of ride distance by bike type is slightly more right-skewed for classic bikes compared to electric bikes, with electric bikes exhibiting a wider distribution than classic bikes.
+
+
+## Frequency of user types
+
+
+```{r}
+user_type_counts <- table(capital_bikeshare_clean$member_casual)
+user_type_df <- as.data.frame(user_type_counts)
+```
+
+
+
+Pie chart:
+```{r}
+user_type_df <- user_type_df %>%
+  mutate(percentage = round(Freq / sum(Freq) * 100, 1))
+
+
+ggplot(user_type_df, aes(x = "", y = Freq, fill = Var1)) + 
+  geom_bar(stat = "identity", width = 1) + 
+  coord_polar(theta = "y") + 
+  labs(title = "Proportion of User Types (Member vs Casual)") +
+  scale_fill_manual(values = c("member" = "blue", "casual" = "green")) +
+  theme_void() +
+  geom_text(aes(label = paste("\n", percentage, "%")), position = position_stack(vjust = 0.5))
+```
+
+- There is a significantly higher number of member-type riders in October.
+
+
+
+## User Types by Rideable Type
+
+```{r}
+user_bike_counts <- capital_bikeshare_clean %>%
+  group_by(member_casual, rideable_type) %>%
+  summarise(Freq = n())  
+
+ggplot(user_bike_counts, aes(x = rideable_type, y = Freq, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "dodge") +  
+  labs(title = "User Type Distribution by Rideable Type",
+       x = "Rideable Type (Bike Type)",
+       y = "Frequency of Rides") +
+  scale_fill_manual(values = c("member" = "blue", "casual" = "green")) +  
+  theme_minimal() +
+  scale_y_continuous(labels = scales::comma)
+```
+
+
+- Electric bikes have a higher proportion of member-type riders compared to casual-type riders.
+
+
+## Ride characteristics on weekdays vs weekends
+```{r}
+ggplot(capital_bikeshare_clean, aes(x = day_type, fill = interaction(member_casual, rideable_type))) +
+  geom_bar(position = "dodge") + 
+  labs(title = "Ride characteristics on weekdays vs weekends",
+       x = "Day Type",
+       y = "Count",
+       fill = "Member Type & Rideable Type") +
+  theme_minimal()
+```
+- Overall, there are fewer rides on weekends, with a significant decrease in rides by member-type users during the weekend.
+
+
+# Modelling
+
+
+
+
+
+

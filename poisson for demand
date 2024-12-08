@@ -1,0 +1,34 @@
+library(dplyr)
+
+
+glm_poisson_model <- glm(ride_duration_mins ~ distance_miles + rideable_type + member_casual + start_time_period + day_type, 
+                         family = poisson, data = capital_bikeshare_clean)
+
+summary(glm_poisson_model)
+
+library(pscl)
+pR2(glm_poisson_model)
+
+with(glm_poisson_model, pchisq(null.deviance - deviance, df.null - df.residual, lower.tail = FALSE))
+
+plot(residuals(glm_poisson_model, type = "deviance"))
+
+
+
+pseudo_r2 <- pR2(glm_poisson_model)
+print(pseudo_r2)
+
+
+chi_square_test <- with(glm_poisson_model, pchisq(null.deviance - deviance, df.null - df.residual, lower.tail = FALSE))
+print(chi_square_test)
+
+
+plot(residuals(glm_poisson_model, type = "deviance"))
+
+
+library(AER)
+dispersiontest(glm_poisson_model)
+
+library(MASS)
+nb_model <- glm.nb(ride_duration_mins ~ distance_miles + rideable_type + member_casual + start_time_period + day_type, data = capital_bikeshare_clean)
+summary(nb_model)
