@@ -553,56 +553,172 @@ predicted_duration
 
 
 
-```{r}
-rideable_typeLogit <- glm(rideable_type ~ member_casual + distance_miles + ride_duration_mins + start_time_period, data = capital_bikeshare_clean, family = "binomial")
-
-summary(rideable_typeLogit)
-```
-The logistic regression model shows that several factors significantly influence the `rideable_type.` The coefficient for `member_casualmember` indicates that `members` are less likely to use the specified `rideable_type` compared to `casual` users. `Distance_miles` has a positive impact, suggesting that longer rides are more likely to use this `rideable_type`, while `ride_duration_mins` negatively affects the likelihood. Among the time periods, Early Morning, Night, and Late Evening show higher log-odds compared to other periods like Morning, Mid-Morning, and Evening, which have lower log-odds. The model’s residual deviance (899759) is much lower than the null deviance (933757), indicating a good fit. 
 
 ```{r}
-rideable_typeModel <- rpart(rideable_type ~ ride_duration_mins+member_casual + distance_miles + start_time_period, data = capital_bikeshare_clean, method = "class")
-print(summary(rideable_typeModel))
-```
+rideable_typeLogit1 <- glm(rideable_type ~ member_casual , data = capital_bikeshare_clean, family = "binomial")
 
-```{r}
-rpart.plot(rideable_typeModel, type = 3, extra = 1, main = "Classification Tree for Rideable type Prediction")
-```
-```{r}
-print(rideable_typeModel$cptable)
-```
-
-```{r}
-plotcp(rideable_typeModel)
-```
-
-```{r, results="markup"}
-fold <- floor(runif(nrow(capital_bikeshare_clean),1,11)) 
-capital_bikeshare_clean$fold <- fold
-## the test set is just the first fold 
-test.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold == 1,] 
-##exclude the first fold from the data here 
-train.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold != 1,]
-rideable_typeModel_fold <- rpart(rideable_type ~ ride_duration_mins+member_casual + distance_miles + start_time_period, data=train.set, method="class" )
-fancyRpartPlot(rideable_typeModel_fold)
+summary(rideable_typeLogit1)
 ```
 
 
 ```{r}
-pred <- predict(rideable_typeModel_fold, test.set) 
-plot(pred,test.set$rideable_type, main="Predicted vs. Observed rideable_type", xlab="Tree classified rideable_type", ylab="Observed rideable_type")
-treefit_fold_error = sum(pred-test.set$rideable_type)^2
-print(treefit_fold_error)
+rideable_typeLogit2 <- glm(rideable_type ~ member_casual +distance_miles, data = capital_bikeshare_clean, family = "binomial")
+
+summary(rideable_typeLogit2)
 ```
 
 
 ```{r}
-library(caret) 
-cm = confusionMatrix( predict(rideable_typeModel, type = "class"), reference = capital_bikeshare_clean[, "rideable_type"] )
-print('Overall: ')
-cm$overall
-print('Class: ')
-cm$byClass
+rideable_typeLogit3 <- glm(rideable_type ~ member_casual *distance_miles, data = capital_bikeshare_clean, family = "binomial")
 
+summary(rideable_typeLogit3)
 ```
 
+```{r}
+rideable_typeLogit4 <- glm(rideable_type ~ member_casual +distance_miles+ ride_duration_mins, data = capital_bikeshare_clean, family = "binomial")
+
+summary(rideable_typeLogit4)
+```
+
+
+```{r}
+rideable_typeLogit5 <- glm(rideable_type ~ member_casual *distance_miles* ride_duration_mins, data = capital_bikeshare_clean, family = "binomial")
+
+summary(rideable_typeLogit5)
+```
+
+
+```{r}
+rideable_typeLogit6 <- glm(rideable_type ~ member_casual +distance_miles+ ride_duration_mins+start_time_period, data = capital_bikeshare_clean, family = "binomial")
+
+summary(rideable_typeLogit6)
+```
+
+```{r}
+rideable_typeLogit7 <- glm(rideable_type ~ member_casual *distance_miles* ride_duration_mins*start_time_period, data = capital_bikeshare_clean, family = "binomial")
+
+summary(rideable_typeLogit7)
+```
+
+```{r}
+rideable_typeLogit8 <- glm(rideable_type ~ member_casual +distance_miles+ ride_duration_mins+start_time_period+day_type, data = capital_bikeshare_clean, family = "binomial")
+
+summary(rideable_typeLogit8)
+```
+
+```{r}
+anova_result <- anova(rideable_typeLogit1, rideable_typeLogit2, rideable_typeLogit3, rideable_typeLogit4, rideable_typeLogit5, rideable_typeLogit6, rideable_typeLogit7, rideable_typeLogit8, test = "Chisq")
+print(anova_result)
+```
+
+NOTES:
+
+
+Models with interaction terms (Models 3, 5, 7) tend to show a significant improvement in deviance, indicating that interactions between member_casual, distance_miles, ride_duration_mins, and start_time_period are important in explaining rideable_type.
+Adding ride_duration_mins and distance_miles substantially improves model fit.
+The variable start_time_period increases deviance when added in Model 6, suggesting it may not be a good predictor in this context.
+Adding day_type in Model 8 also worsens the model, indicating it doesn't contribute to explaining rideable_type.
+ Model 5 (with interactions between all three of member_casual, distance_miles, and ride_duration_mins) seems to be the best fit.
+ 
+
+
+```{r}
+rideable_typeLogit9 <- glm(rideable_type ~ member_casual +distance_miles+ ride_duration_mins+(member_casual *distance_miles), data = capital_bikeshare_clean, family = "binomial")
+```
+ 
+```{r}
+ rideable_typeLogit10 <- glm(rideable_type ~ member_casual +distance_miles+ ride_duration_mins+(member_casual *distance_miles) + (member_casual*ride_duration_mins), data = capital_bikeshare_clean, family = "binomial")
+```
+
+
+
+```{r}
+ rideable_typeLogit11 <- glm(rideable_type ~ member_casual +distance_miles+ ride_duration_mins+(member_casual *distance_miles) + (distance_miles*ride_duration_mins), data = capital_bikeshare_clean, family = "binomial")
+```
+
+```{r}
+anova_result <- anova(rideable_typeLogit1, rideable_typeLogit2, rideable_typeLogit3, rideable_typeLogit4, rideable_typeLogit5, rideable_typeLogit6, rideable_typeLogit7, rideable_typeLogit8,rideable_typeLogit9,rideable_typeLogit10,rideable_typeLogit11, test = "Chisq")
+print(anova_result)
+```
+Based on the anova results, checking for the vif of top five models
+```{r}
+vif(rideable_typeLogit5)
+vif(rideable_typeLogit7)
+vif(rideable_typeLogit10)
+vif(rideable_typeLogit2)
+```
+
+Based on the VIF and ANOVA results, models that include both member_casual and distance_miles are preferable due to their significant improvements in model fit, as evidenced by the deviance reductions and highly significant p-values. 
+
+
+```{r}
+predicted_probs <- predict(rideable_typeLogit2, type = "response")
+
+# Classify based on a threshold of 0.5
+predicted_classes <- ifelse(predicted_probs > 0.5, "electric_bike", "classic_bike")
+predicted_classes <- factor(predicted_classes, levels = c("electric_bike", "classic_bike"))
+actual_classes <- factor(capital_bikeshare_clean$rideable_type, levels = c("electric_bike", "classic_bike"))
+
+# Create the confusion matrix
+conf_matrix <- confusionMatrix(predicted_classes, actual_classes)
+
+# Print the confusion matrix and statistics
+print(conf_matrix)
+
+# Extract accuracy
+accuracy <- conf_matrix$overall["Accuracy"]
+print(paste("Accuracy:", round(accuracy, 4)))
+```
+
+
+
+The model's accuracy is 0.622, meaning it correctly predicted 62.2% of the cases. However, the model is biased towards predicting the electric_bike class, with 100% sensitivity (all electric_bike instances were correctly classified) and 0% specificity (no classic_bike instances were correctly predicted). The Kappa statistic is 0, indicating no agreement beyond chance. The Mcnemar's Test p-value is highly significant (<2e-16), suggesting a strong difference in prediction errors for the two classes. Balanced accuracy is 0.5, reflecting the imbalance in predictions.
+
+
+
+
+electric_bike_data <- capital_bikeshare_clean[capital_bikeshare_clean$rideable_type == "electric_bike", ]
+classic_bike_data <- capital_bikeshare_clean[capital_bikeshare_clean$rideable_type == "classic_bike", ]
+
+# Sample 2000 random rows from each type
+electric_bike_sample <- electric_bike_data[sample(nrow(electric_bike_data), 2000), ]
+classic_bike_sample <- classic_bike_data[sample(nrow(classic_bike_data), 2000), ]
+
+# Combine both samples into a new dataset
+sampled_data <- rbind(electric_bike_sample, classic_bike_sample)
+
+
+
+```{r}
+ rideable_typeLogit_sample <- glm(rideable_type ~ member_casual +distance_miles+ride_duration_mins+start_time_period, data = sampled_data, family = "binomial")
+vif(rideable_typeLogit_sample)
+```
+
+```{r}
+predicted_probs <- predict(rideable_typeLogit_sample, type = "response")
+
+# Classify based on a threshold of 0.5
+predicted_classes <- ifelse(predicted_probs > 0.5, "electric_bike", "classic_bike")
+predicted_classes <- factor(predicted_classes, levels = c("electric_bike", "classic_bike"))
+actual_classes <- factor(sampled_data$rideable_type, levels = c("electric_bike", "classic_bike"))
+
+# Create the confusion matrix
+conf_matrix <- confusionMatrix(predicted_classes, actual_classes)
+
+# Print the confusion matrix and statistics
+print(conf_matrix)
+
+# Extract accuracy
+accuracy <- conf_matrix$overall["Accuracy"]
+print(paste("Accuracy:", round(accuracy, 4)))
+```
+
+
+
+Accuracy: 0.623, meaning the model correctly predicted 62.3% of cases.
+Kappa: 0.245, indicating slight agreement beyond chance.
+Sensitivity (Recall for electric_bike): 0.694, meaning the model correctly predicted 69.4% of actual electric_bike cases.
+Specificity: 0.551, meaning the model correctly predicted 55.1% of classic_bike cases.
+Positive Predictive Value: 0.607, meaning 60.7% of predicted electric_bike cases were correct.
+Negative Predictive Value: 0.643, meaning 64.3% of predicted classic_bike cases were correct.
+Balanced Accuracy: 0.623, which is the average of sensitivity and specificity, indicating the model is fairly balanced in predicting both classes.
