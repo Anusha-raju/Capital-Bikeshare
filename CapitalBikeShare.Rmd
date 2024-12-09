@@ -459,12 +459,12 @@ fold <- floor(runif(nrow(capital_bikeshare_clean),1,11))
 test.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold == 1,] 
 ##exclude the first fold from the data here 
 train.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold != 1,]
-treefit_fold <- rpart(member_casual~ rideable_type + distance_miles + ride_duration_mins + start_time_period, day_type, data = capital_bikeshare_clean, method = "class")
+treefit_fold <- rpart(member_casual~ rideable_type + distance_miles + ride_duration_mins + start_time_period+ day_type, data = capital_bikeshare_clean, method = "class")
 
 fancyRpartPlot(treefit_fold)
 
 pred <- predict(treefit_fold, test.set) 
-plot(pred,test.set$member_casual, main="Predicted vs. Observed Salary", xlab="Tree Predicted Salary", ylab="Observed Salary")
+
 treefit_fold_error = sum(pred-test.set$member_casual)^2
 treefit_fold_error <- sum((pred - test.set$member_casual)^2)
 pred <- pred[, 2]  # Convert matrix to vector
@@ -476,6 +476,60 @@ print(treefit_fold_error)
 
 
 ```
+
+```{r}
+# Load necessary libraries
+library(rpart)
+library(rpart.plot)
+
+# K-fold cross-validation
+set.seed(123)  # For reproducibility
+fold <- floor(runif(nrow(capital_bikeshare_clean), 1, 6)) 
+capital_bikeshare_clean$fold <- fold
+
+# Create empty vectors to store results
+accuracy_results <- c()
+
+# Loop through each fold (1 to 10)
+for (i in 1:5) {
+  # Create the test and training sets
+  test.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold == i,] 
+  train.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold != i,]
+  
+  # Train the decision tree model
+  Member_casual_tree <- rpart(member_casual ~ rideable_type + distance_miles + ride_duration_mins + start_time_period + day_type, 
+                              data = train.set, 
+                              method = "class")
+  
+  # Visualize the tree (optional)
+  rpart.plot(Member_casual_tree, type = 3, extra = 1, main = "Classification Tree for Member vs Casual Prediction")
+  
+  # Print the summary of the tree
+  printcp(Member_casual_tree)
+  
+  # Make predictions on the test set
+  pred_prob <- predict(Member_casual_tree, test.set, type = "prob")
+  
+  # Convert probabilities to predicted classes (1 for 'Member', 2 for 'Casual')
+  pred_class <- ifelse(pred_prob[, 2] > 0.5, "casual", "member")  # Assuming 2nd class (casual) is the positive class
+  
+  # Calculate the accuracy
+  accuracy <- sum(pred_class == test.set$member_casual) / nrow(test.set)
+  
+  # Store the accuracy for this fold
+  accuracy_results[i] <- accuracy
+}
+
+# Calculate the average accuracy across all folds
+mean_accuracy <- mean(accuracy_results)
+print(paste("Average accuracy across all folds: ", round(mean_accuracy, 4)))
+
+# Optionally, visualize the final tree (trained on all data)
+rpart.plot(Member_casual_tree, type = 3, extra = 1, main = "Final Classification Tree")
+
+
+```
+
 
 
 ```{r}
