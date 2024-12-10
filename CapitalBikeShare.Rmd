@@ -401,7 +401,25 @@ The odds ratio for late evening is 1.10, meaning the odds of being a memberis 10
 The odds ratio for weekend rides is 0.568, meaning riders on weekends are 34% (1-0.658) less likely to be members.
 The odds ratio for the interaction between bike type and duration is 1.041, meaning each additional minute of ride time on electric bikes increases the odds of being a memebr by 4.1%, which counteracts the negative effect of longer rides overall.
 
-Riders are overall more likely to be memebrs. Electric bikes and longer rides reduce the odds, though less so if the longer ride is on an electric bike. Longer distances, increase the odds of membership, while weekends reduce the odds. Morning rides strongly increase the odds of membership.
+Riders are overall more likely to be members. Electric bikes and longer rides reduce the odds, though less so if the longer ride is on an electric bike. Longer distances, increase the odds of membership, while weekends reduce the odds. Morning rides strongly increase the odds of membership.
+
+```{r}
+null_deviance <- 888015
+residual_deviance <- 847441
+delta_df <- 703942 - 703930
+
+delta_D <- null_deviance - residual_deviance
+
+p_value <- pchisq(delta_D, df = delta_df, lower.tail = FALSE)
+
+cat("Change in deviance:", delta_D, "\nDegrees of freedom:", delta_df, "\nP-value:", p_value, "\n")
+```
+
+Deviance Test
+H0: The null model is better than the model with predictors
+H1: The model will predictors is better/improves model fit.
+
+This model shows a substantial reduction in deviance (40574) for 12 degrees of freedom with a p-value essentially equal to zero. We reject H0 and conclude the model with predictors fets the data significantly better than the null model.
 
 
 ```{r}
@@ -421,9 +439,30 @@ print(conf_matrix)
 # Extract accuracy
 accuracy <- conf_matrix$overall["Accuracy"]
 print(paste("Accuracy:", round(accuracy, 4)))
+
+
+predicted_probs <- predict(riderLogit10, type = "response")
+
+# Classify based on a threshold of 0.5
+predicted_classes <- ifelse(predicted_probs > 0.6, "member", "casual")
+predicted_classes <- factor(predicted_classes, levels = c("member", "casual"))
+actual_classes <- factor(capital_bikeshare_clean$member_casual, levels = c("member", "casual"))
+
+# Create the confusion matrix
+conf_matrix <- confusionMatrix(predicted_classes, actual_classes)
+
+# Print the confusion matrix and statistics
+print(conf_matrix)
+
+# Extract accuracy
+accuracy <- conf_matrix$overall["Accuracy"]
+print(paste("Accuracy:", round(accuracy, 4)))
+
 ```
 
 This model is approximately 70% accurate, which is less than the 80% target but decent considering the data for this month is moderately skewed toward members. The No Information Rate (NIR) is 0.675 or 67.5%, which is the accuracy of a naive model always predicting the majority class - this model is statistically significantly better than the NIR. However the Kappa is low, suggesting limited improvement over guessing and Mcnemar's test indicates the model misclassifies disporportionately.Not surprisingly, this model is very sensitive (very good at identifying members), but not very specific (not good at identifying casual riders).
+
+Try changing the cutoff for improved specificy and sensitivity.
 
 
 ```{r}
