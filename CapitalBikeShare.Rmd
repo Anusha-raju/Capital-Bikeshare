@@ -578,14 +578,14 @@ library(rpart)
 library(rpart.plot)
 
 # K-fold cross-validation
-set.seed(123)  # For reproducibility
+set.seed(123)
 fold <- floor(runif(nrow(capital_bikeshare_clean), 1, 6)) 
 capital_bikeshare_clean$fold <- fold
 
-# Create empty vectors to store results
+#vector to store results
 accuracy_results <- c()
 
-# Loop through each fold (1 to 10)
+# Loop through each fold
 for (i in 1:5) {
   # Create the test and training sets
   test.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold == i,] 
@@ -596,33 +596,29 @@ for (i in 1:5) {
                               data = train.set, 
                               method = "class")
   
-  # Visualize the tree (optional)
-  rpart.plot(Member_casual_tree, type = 3, extra = 1, main = "Classification Tree for Member vs Casual Prediction")
+  # Visualize the tree
+  #rpart.plot(Member_casual_tree, type = 3, extra = 1, main = "Classification Tree for Member vs Casual Prediction")
   
-  # Print the summary of the tree
+  # summary of the tree
   printcp(Member_casual_tree)
   
-  # Make predictions on the test set
+  # predictions on the test set
   pred_prob <- predict(Member_casual_tree, test.set, type = "prob")
   
-  # Convert probabilities to predicted classes (1 for 'Member', 2 for 'Casual')
+  # probabilities to predicted classes (1 for 'Member', 2 for 'Casual')
   pred_class <- ifelse(pred_prob[, 2] > 0.5, "casual", "member")  # Assuming 2nd class (casual) is the positive class
   
-  # Calculate the accuracy
+  #  accuracy of the current fold
   accuracy <- sum(pred_class == test.set$member_casual) / nrow(test.set)
-  
-  # Store the accuracy for this fold
   accuracy_results[i] <- accuracy
 }
 
-# Calculate the average accuracy across all folds
+# average accuracy across all folds
 mean_accuracy <- mean(accuracy_results)
 print(paste("Average accuracy across all folds: ", round(mean_accuracy, 4)))
 
-# Optionally, visualize the final tree (trained on all data)
+# final tree visualization
 rpart.plot(Member_casual_tree, type = 3, extra = 1, main = "Final Classification Tree")
-
-
 ```
 
 
