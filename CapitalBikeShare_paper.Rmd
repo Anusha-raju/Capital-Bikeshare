@@ -254,7 +254,7 @@ user_type_df <- as.data.frame(user_type_counts)
 
 
 
-Pie chart:
+*Pie chart:*
 ```{r}
 user_type_df <- user_type_df %>%
   mutate(percentage = round(Freq / sum(Freq) * 100, 1))
@@ -312,6 +312,93 @@ ggplot(capital_bikeshare_clean, aes(x = day_type, fill = interaction(member_casu
 Our goal was to use trip characteristics to predict whether users are members or casual. This is a binary classification problem, so we utilitized models suited to this type of problem: decision tree and logistic regression. 
 
 # Decision Tree
+
+```{r}
+# K-fold cross-validation
+set.seed(123)
+fold <- floor(runif(nrow(capital_bikeshare_clean), 1, 6)) 
+capital_bikeshare_clean$fold <- fold
+
+#vector to store results
+accuracy_results <- c()
+
+# Loop through each fold
+for (i in 1:5) {
+  # Create the test and training sets
+  test.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold == i,] 
+  train.set <- capital_bikeshare_clean[capital_bikeshare_clean$fold != i,]
+  
+  # Train the decision tree model
+  Member_casual_tree <- rpart(member_casual ~ rideable_type + distance_miles + ride_duration_mins + start_time_period + day_type, 
+                              data = train.set, 
+                              method = "class")
+  
+  # Visualize the tree
+  #rpart.plot(Member_casual_tree, type = 3, extra = 1, main = "Classification Tree for Member vs Casual Prediction")
+  
+  # summary of the tree
+  printcp(Member_casual_tree)
+  
+  # predictions on the test set
+  pred_prob <- predict(Member_casual_tree, test.set, type = "prob")
+  
+  # probabilities to predicted classes (1 for 'Member', 2 for 'Casual')
+  pred_class <- ifelse(pred_prob[, 2] > 0.5, "casual", "member")  # Assuming 2nd class (casual) is the positive class
+  
+  #  accuracy of the current fold
+  accuracy <- sum(pred_class == test.set$member_casual) / nrow(test.set)
+  accuracy_results[i] <- accuracy
+}
+
+# average accuracy across all folds
+mean_accuracy <- mean(accuracy_results)
+print(paste("Average accuracy across all folds: ", round(mean_accuracy, 4)))
+
+```
+
+This analysis focuses on building a decision tree model to explore how features like rideable type, distance, ride duration, time of day, and day type influence the classification of bike riders as either "Member" or "Casual." The methodology below outlines the steps for training, evaluating, and visualizing the model using K-fold cross-validation.
+
+
+We assign each observation a fold number ranging from 1 to 5. This division allows each fold to act as a test set in turn while the rest of the data is used for training.
+
+*Decision Tree Model Training*
+We use the `rpart` package in R to build a decision tree classifier. The target variable, member_casual, is predicted based on the following features:
+
+`rideable_type`: Type of bike.
+
+`distance_miles`: Distance traveled in miles.
+
+`ride_duration_mins`: Duration of the ride in minutes.
+
+`start_time_period`: Time period when the ride started (e.g., morning, afternoon).
+
+`day_type`: Type of day (e.g., weekday or weekend).
+
+For each fold, the decision tree model is trained on the training dataset using the rpart function, with the method specified as "class" since it is a classification problem. The model is then summarized to obtain key information about the tree's structure.
+
+*Model Evaluation*
+After training the model on the training set, predictions are made on the test set. The predicted probabilities for each class ("Member" or "Casual") are generated using the predict function. The predicted class is then determined by comparing the probabilities to a threshold of 0.5 (i.e., if the probability of being "Casual" exceeds 0.5, the prediction is classified as "Casual"; otherwise, it is classified as "Member").
+
+The accuracy for each fold is calculated by comparing the predicted class labels to the true labels in the test set. These accuracies are stored in the `accuracy_results` vector.
+
+*Accuracy Calculation*
+After completing all five folds, the average accuracy across all folds is calculated. This average provides a more robust evaluation of the model's performance, as it considers the variation across different subsets of the data.
+```{r}
+# final tree visualization
+rpart.plot(Member_casual_tree, type = 3, extra = 1, main = "Final Classification Tree")
+```
+
+*Final Decision Tree Visualization*
+After completing the cross-validation process, a final decision tree is trained using the entire dataset. This final model is visualized using the rpart.plot function to present a clear representation of the decision tree, showing how different features contribute to the classification of bike riders.
+
+#### Key insights:
+1] After running the classification tree, we found that the two most important variables in predicting whether a rider is a member or casual were ride duration and rideable type. This suggests that the length of the ride and the type of bike used are key differentiators between the two groups. For example, members might use bikes for longer commutes, while casual riders could tend to make shorter trips. Similarly, the type of bike may indicate a preference for certain users, with members possibly opting for more electric bikes.
+
+2] The root node error (the initial error before any splits) was 0.3% for each fold, which provides an initial baseline for the classification accuracy.
+The cross-validation error, indicated as xerror, remained consistently low across different subsets of the data, fluctuating by 0.002 in standard deviation.
+
+
+3] The average accuracy across all the folds came out to be around 31.13%.While this is a modest result, this decision tree model provides valuable insights into how trip characteristics influence whether a rider is a member or a casual user. Another interesting limitation of this tree is that the number of splits is 3. This reflects that there is an imbalance between members and casual riders in the dataset, the tree might favor the majority class and not make many splits, as there’s less incentive to separate the minority class.
 
 
 # Logistical Regression Model
