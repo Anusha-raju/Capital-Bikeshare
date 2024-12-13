@@ -328,19 +328,16 @@ ggplot(capital_bikeshare_clean, aes(x = day_type, fill = interaction(member_casu
 ```
 - Overall, there are fewer rides on weekends, with a significant decrease in rides by member-type users during the weekend.
 
-#Conclusion on EDA.
-The analysis of the Capital Bikeshare dataset for October 2024 provides clear distinctions between the usage patterns of members and casual users, highlighting their differing motivations and behaviors. Members, who represent the majority of rides, exhibit consistent weekday activity, particularly during peak commuting hours. This behavior aligns with practical and routine travel needs, such as commuting or regular errands. In contrast, casual users are more active on weekends and prefer shorter trips, suggesting their primary use is leisure-oriented.
 
-A key finding is the strong preference for electric bikes, particularly among casual users, who likely value the ease and accessibility they provide for infrequent trips. Ride duration and distance also serve as critical differentiators: members tend to take longer rides over greater distances, whereas casual users favor shorter rides. These differences emphasize the need for tailored operational strategies, such as optimizing bike availability by type and location during high-demand periods.
+The exploratory data analysis of the Capital Bikeshare dataset for October 2024 provides clear distinctions between the usage patterns of members and casual users, highlighting their differing motivations and behaviors. Members, who represent the majority of rides, exhibit consistent weekday activity, particularly during peak commuting hours. This behavior aligns with practical and routine travel needs, such as commuting or regular errands. In contrast, casual users are more active on weekends and prefer shorter trips, suggesting their primary use is leisure-oriented.
 
-Temporal patterns further underscore the importance of time and day in shaping user behavior. Members dominate weekday rides, while casual users significantly increase their activity on weekends and evenings. These insights can guide resource allocation to better match user demand and enhance service efficiency.
+A key finding is the strong preference for electric bikes, particularly among casual users, who likely value the ease and accessibility they provide for infrequent trips. Ride duration and distance also serve as critical differentiators: members tend to take longer rides over greater distances, whereas casual users favor shorter rides. Temporal patterns further underscore the importance of time and day in shaping user behavior. Members dominate weekday rides, while casual users significantly increase their activity on weekends and evenings. 
 
-In summary, the findings highlight the importance of understanding user behavior to improve service delivery. By addressing the distinct needs of members and casual users, Capital Bikeshare can optimize operations, increase user satisfaction, and explore strategies to convert casual users into members. The insights from this analysis provide a foundation for data-driven decision-making to enhance the overall bikeshare experience.
 
 
 # Predict the rider's class based on trip characteristics
 
-Our goal was to use trip characteristics to predict whether users are members or casual. This is a binary classification problem, so we utilitized models suited to this type of problem: decision tree and logistic regression. 
+Our goal was to use trip characteristics to predict whether users are members or casual. This is a binary classification problem, so we utilized models suited to this type of problem: decision tree and logistic regression. 
 
 # Decision Tree
 
@@ -461,7 +458,7 @@ summary(riderLogit11)
 ```
 
 
-ANOVA to compare models and select the best
+We then ran a series of ANOVA tests to compare models and select the best.
 ```{r, echo=TRUE, include=FALSE}
 anova_result <- anova(riderLogit01, riderLogit02, riderLogit03, riderLogit04, riderLogit05, riderLogit06, riderLogit07, riderLogit08, riderLogit09, test = "Chisq")
 print(anova_result)
@@ -482,11 +479,12 @@ anova_result <- anova(riderLogit04, riderLogit10, test = "Chisq")
 print(anova_result)
 ```
 
-We also checked the Variance Inflation Factor to besure there was no multicollinearity.
+We also checked the Variance Inflation Factor to ensure there was no multicollinearity.
 ```{r}
 vif(riderLogit10)
 ```
 
+*Model Selection*
 Initially Models 4 and 6 had the best reduction in residual deviance for minimal change in degrees of freedom that was statistically significant. However the VIF for model 6 indicated a significant amount of multicollinearity. So then we compared model 4 to the full model (9), which showed a smaller but still statistically significant reduction to residual deviance. However this model increased the complexity by 7 degrees of freedom. We tried 2 other versions of the model, incorporating the interaction terms between duration and bike type, but with and without the time-of-day (start_time_period). Model10(riderLogit10) including all variables and the interaction between duration and bike type is a better fit when compared via ANOVA to the model without time-of-day, with a statistically significant reduction in residual deviance.
 
 
@@ -495,6 +493,7 @@ riderLogit10 <- glm(member_casual ~ rideable_type * ride_duration_mins + distanc
 summary(riderLogit10)
 ```
 
+*Logistic Regression Results*
 The intercept is log-odds 1.52, the log-odds of being a member when the bike is a classic, ride duration and distance are 0, it is the afternoon, and it is a weekday.
 
 Electric bike (versus classic bike) reduces the log-odds of being a member by log-odds 0.631.
@@ -515,6 +514,8 @@ The interaction term indicates that for each additional minute of ride duration 
 ```{r}
 exp(coef(riderLogit10))
 ```
+
+*Odds Ratio Interpretation*
 When the log-odds are exponentiated, we can use the odds ratios (OR) to better understand the impact of the variables.
 
 The intercept is 4.559 meaning the odds of being a member are 4.56 times higher than being a casual user when the bike is a classic, it is a weekday afternoon, and ride duration and distance are 0.
@@ -551,6 +552,7 @@ p_value <- pchisq(delta_D, df = delta_df, lower.tail = FALSE)
 cat("Change in deviance:", delta_D, "\nDegrees of freedom:", delta_df, "\nP-value:", p_value, "\n")
 ```
 
+*Deviance Test*
 A Deviance Test was performed to assess model fit. 
 
 H0: The null model is better than the model with predictors
@@ -574,6 +576,7 @@ accuracy <- conf_matrix$overall["Accuracy"]
 print(paste("Accuracy:", round(accuracy, 4)))
 ```
 
+*Confusion Matrix and Accuracy Tests*
 This model is approximately 70% accurate, which is less than the 80% target but decent considering the data for this month is moderately skewed toward members. The No Information Rate (NIR) is 0.675 or 67.5%, which is the accuracy of a naive model always predicting the majority class - this model is statistically significantly better than the NIR. However the Kappa is low, suggesting limited improvement over guessing and Mcnemar's test indicates the model misclassifies disporportionately.Not surprisingly, this model is very sensitive (very good at identifying members), but not very specific (not good at identifying casual riders).
 
 
@@ -593,6 +596,7 @@ print(paste("Accuracy:", round(accuracy, 4)))
 
 ```
 
+*Confusion Matrix and Accuracy Test with Increased Cutoff*
 To improve sensitivity and specificity, we changed the cutoff to 0.61 (increased from 0.5). This reduced the sensitivity from 0.965 to 0.866, increased the specificity from 0.128 to 0.290, and only minimally reduced the accuracy from 0.693 to 0.679. At the 0.61 cutoff, this model is still statistically better than the NIR; at 0.62 it is not, so 0.61 is the likely the best cutoff. 
 
 
@@ -606,14 +610,16 @@ print(paste("AUC (ModelMetrics):", round(auc_value10, 4)))
 
 ```
 
+*Reciever Operating Characteristic (ROC) Curve and Area Under the Curve (AUC)*
 The AUC of the model is 0.6337 which is certainly below the target of 0.8, but still better than the null model.
 
-McFadden R-squared
+
 ```{r, echo=TRUE}
 riderLogit10pr2 = pR2(riderLogit10)
 riderLogit10pr2
 ```
 
+*Measures of Pseudo R-square including McFadden's*
 The McFadden's R-square is 0.0457 or (4.57%), which indicates this model explains a small but meaningful portion of variation in outcome compared to the null model. 
 
 
