@@ -1,0 +1,15 @@
+Discovering the Ride: Exploring Capital Bikeshare Usage
+Imagine you're exploring the vibrant streets of Washington, D.C., zipping past landmarks and bustling neighborhoods on a Capital Bikeshare bike. But have you ever wondered: Who uses these bikes? What drives their choices? How far and how long are they riding?
+Our project dives into these questions, analyzing over 700,000 rides from Capital Bikeshare’s extensive dataset. With over 700 stations spanning D.C., Maryland, and Virginia, this system connects communities with two-wheel freedom—offering both electric and classic bikes for casual riders and registered members alike.
+What We’re Asking:
+Electric vs. Classic Bikes: Which type do riders prefer, and how far do they go?
+Trip Duration: Do electric bike riders tend to take shorter or longer rides?
+Who’s Riding? What are the differences between registered members and casual users?
+Neighborhood Trends: Which areas see the highest trip activity?
+What We’ll Predict:
+Can we determine whether a rider is a registered member or casual rider based on trip characteristics?
+How well can we predict ride duration from trip and user data?
+What clues help us predict whether a rider will choose an electric or classic bike?
+With insights like these, we’re working toward better understanding user behavior and improving bikeshare systems for everyone.
+Join Us on This Journey
+This exploration isn't just about data—it's about real people navigating their city. From a casual weekend ride to a daily commute, Capital Bikeshare tells a story of connection, mobility, and innovation. So, let's dive in and see where the wheels take us!

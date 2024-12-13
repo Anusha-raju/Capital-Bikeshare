@@ -1,0 +1,35 @@
+library(dplyr)
+library(ggplot2)
+library(geosphere)
+
+# Load the dataset
+capital_bikeshare <- read.csv("202410-capitalbikeshare-tripdata.csv", header = TRUE)
+
+# Preprocessing
+# Drop rows with missing end_lat
+capital_bikeshare <- capital_bikeshare %>%
+  filter(!is.na(end_lat))
+
+# Calculate distance in miles
+capital_bikeshare$distance_miles <- mapply(function(lat1, lon1, lat2, lon2) {
+  distVincentySphere(c(lon1, lat1), c(lon2, lon2)) / 1000 * 0.621371  
+}, capital_bikeshare$start_lat, capital_bikeshare$start_lng, capital_bikeshare$end_lat, capital_bikeshare$end_lng)
+
+# Filter data for electric bikes and classic bikes
+electric_bikes <- capital_bikeshare %>% filter(rideable_type == "electric_bike")
+classic_bikes <- capital_bikeshare %>% filter(rideable_type == "classic_bike")
+
+
+# Plot the distribution of distances
+ggplot() +
+  geom_histogram(data = electric_bikes, aes(x = distance_miles), bins = 50, fill = "blue", alpha = 0.5, label = "Electric Bikes") +
+  geom_histogram(data = classic_bikes, aes(x = distance_miles), bins = 25
+                 , fill = "red", alpha = 0.5, label = "Classic Bikes") +
+  labs(title = "Distribution of Distances Ridden on Electric Bike vs Classic Bike",
+       x = "Distance (miles)",
+       y = "Frequency") +
+  theme_minimal() +
+  scale_fill_manual(values = c("Electric Bikes" = "blue", "Classic Bikes" = "red")) +
+  theme(legend.position = "top") +
+  guides(fill = guide_legend(title = "Bike Type"))
+
