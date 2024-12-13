@@ -305,6 +305,14 @@ ggplot(capital_bikeshare_clean, aes(x = day_type, fill = interaction(member_casu
   theme_minimal()
 ```
 - Overall, there are fewer rides on weekends, with a significant decrease in rides by member-type users during the weekend.
+#Conclusion on EDA.
+The analysis of the Capital Bikeshare dataset for October 2024 provides clear distinctions between the usage patterns of members and casual users, highlighting their differing motivations and behaviors. Members, who represent the majority of rides, exhibit consistent weekday activity, particularly during peak commuting hours. This behavior aligns with practical and routine travel needs, such as commuting or regular errands. In contrast, casual users are more active on weekends and prefer shorter trips, suggesting their primary use is leisure-oriented.
+
+A key finding is the strong preference for electric bikes, particularly among casual users, who likely value the ease and accessibility they provide for infrequent trips. Ride duration and distance also serve as critical differentiators: members tend to take longer rides over greater distances, whereas casual users favor shorter rides. These differences emphasize the need for tailored operational strategies, such as optimizing bike availability by type and location during high-demand periods.
+
+Temporal patterns further underscore the importance of time and day in shaping user behavior. Members dominate weekday rides, while casual users significantly increase their activity on weekends and evenings. These insights can guide resource allocation to better match user demand and enhance service efficiency.
+
+In summary, the findings highlight the importance of understanding user behavior to improve service delivery. By addressing the distinct needs of members and casual users, Capital Bikeshare can optimize operations, increase user satisfaction, and explore strategies to convert casual users into members. The insights from this analysis provide a foundation for data-driven decision-making to enhance the overall bikeshare experience.
 
 
 # Predict the rider's class based on trip characteristics
