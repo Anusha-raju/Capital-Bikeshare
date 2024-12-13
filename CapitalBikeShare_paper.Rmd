@@ -579,9 +579,7 @@ riderLogit10pr2
 ```
 
 The McFadden's R-square is 0.0457 or (4.57%), which indicates this model explains a small but meaningful portion of variation in outcome compared to the null model. 
-This dataset is a small snapshot of users and may not accurately reflect the true distribution of users of the course of the year. In order to accommodate the imbalance in the classes, we could create a subset sample that oversamples the casual riders (the minority class) and undersamples the member riders (the majority class), to create a balanced sample for the the analysis. However we did not feel the imbalance was so extreme that this would be necessary. Additionally, we suspect that if an entire year were sampled, the classes may be more balanced. There are many additional factors that likely affect class distribution and bike usage including time of year/season, weather, sunset times. A dataset of the entire year would likely contain at least 10-12 million observations.  
-
-
+This dataset is a small snapshot of users and is only for October. It may not accurately reflect the true distribution of users over the year. In order to accommodate the imbalance in the classes, we could create a subset sample that oversamples the casual riders (the minority class) and undersamples the member riders (the majority class), to create a balanced sample for the the analysis. However, we did not feel the imbalance was so extreme that this would be necessary. Additionally, we suspect that the classes may be more balanced if an entire year was sampled. Many additional factors likely affect class distribution and bike usage, including time of year/season, weather, and sunset times. A dataset of the entire year would likely contain at least 10-12 million observations, which would require more computing power than we have.
 
 
 
