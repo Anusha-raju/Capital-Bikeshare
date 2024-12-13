@@ -58,6 +58,13 @@ library(pscl)
 
 *Capital Bikeshare* is a bicycle-sharing system that serves Washington, D.C., and certain counties of the larger metropolitan area in both Maryland and Virginia. Users can select from electric or classic bikes at over 700 locations, either as a casual rider or with a monthly membership. The dataset is of October 2024.
 
+# Literature Review
+
+The earliest well-known community bicycle started in 1965 in Amsterdam, Netherlands. Since then cities of all sizes and around the world have introduced programs. Bike-sharing is a way to solve the "last mile" problem of public transit networks, providing a bridge between people's homes and public transit hub ("Bicycle-sharing systems", 2024). In 2008, Washington, DC became the first city in North America to launch a bike-sharing system, called SmartBike DC. Within a couple years, Arlington, VA, Alexandria, VA, and Montgomery County, MD collaborated with DC to form Capital Bikeshare in 2010 (Capital Bikeshare,2022).
+
+Since it's inception, extensive research has been done on bike-sharing, and on Capital Bikeshare specifically. In 2024, Sadeghvarziri et. al. analyzed the influential factors and dynamics of bikeshare utilization in DC. This study included more than 3 million ride obvervations, and concluded temporal trends highlighted peak mid-weekday ridership, aligning with daily work commutes, and that docked bikes are favored on weekdays, electric bikes on weekends, and members are less likely to choose classic bikes. (Sadeghvaziri et. al., 2024). This valuable information can be used to make data-driven driven decisions about the program. 
+
+Additionally, bikesharing in DC plays an integral role in transit accessibility in DC. In 2024, Tushar & Buehler (2024), found more bike trails, bike lanes, and metrorail stations within 1 mi of neighborhood docking stations and shorter distances between neighborhood docking stations are associated with more bikeshare trips. This reinforces the importance of infrastructure with respect to attracting bikeshare users (Tushar & Buehler 2024). 
 
 ```{r}
 file_path <- file.path(getwd(), "202410-capitalbikeshare-tripdata.csv")
@@ -589,6 +596,15 @@ riderLogit10pr2
 The McFadden's R-square is 0.0457 or (4.57%), which indicates this model explains a small but meaningful portion of variation in outcome compared to the null model. 
 This dataset is a small snapshot of users and is only for October. It may not accurately reflect the true distribution of users over the year. In order to accommodate the imbalance in the classes, we could create a subset sample that oversamples the casual riders (the minority class) and undersamples the member riders (the majority class), to create a balanced sample for the the analysis. However, we did not feel the imbalance was so extreme that this would be necessary. Additionally, we suspect that the classes may be more balanced if an entire year was sampled. Many additional factors likely affect class distribution and bike usage, including time of year/season, weather, and sunset times. A dataset of the entire year would likely contain at least 10-12 million observations, which would require more computing power than we have.
 
+# References
 
+Bicycle-sharing systems. (2024, November 7).
+  In *Wikipedia*. https://en.wikipedia.org/wiki/Bicycle-sharing_system
+
+*About Company & History*. (n.d). Capital Bikeshare. Retrieved December 13, 2024,   from https://ride.capitalbikeshare.com/about
+
+Sadeghvaziri, E., Javid, R., Constantin, N. (2024). Analyzing the Influential       Factors and Dynamics of Bikeshare Utilization in Washington, DC.                  *International Conference on Transportation and Development*.                     https://doi.org/10.1061/9780784485521.028
+
+Tushar, M.D., & Buehler, R. (2024). Bikeshare–Metrorail Integration in Washington,    D.C.: What are the Characteristics of Neighborhoods that Encourage Capital        Bikeshare Trips to and from the Metrorail? *Journal of the Transportation         Research Board, 2678*(10). https://doi.org/10.1177/03611981241233275
 
 
