@@ -62,9 +62,9 @@ library(pscl)
 
 The earliest well-known community bicycle started in 1965 in Amsterdam, Netherlands. Since then cities of all sizes and around the world have introduced programs. Bike-sharing is a way to solve the "last mile" problem of public transit networks, providing a bridge between people's homes and public transit hub ("Bicycle-sharing systems", 2024). In 2008, Washington, DC became the first city in North America to launch a bike-sharing system, called SmartBike DC. Within a couple years, Arlington, VA, Alexandria, VA, and Montgomery County, MD collaborated with DC to form Capital Bikeshare in 2010 (Capital Bikeshare,2022).
 
-Since it's inception, extensive research has been done on bike-sharing, and on Capital Bikeshare specifically. In 2024, Sadeghvarziri et. al. analyzed the influential factors and dynamics of bikeshare utilization in DC. This study included more than 3 million ride obvervations, and concluded temporal trends highlighted peak mid-weekday ridership, aligning with daily work commutes, and that docked bikes are favored on weekdays, electric bikes on weekends, and members are less likely to choose classic bikes. (Sadeghvaziri et. al., 2024). This valuable information can be used to make data-driven driven decisions about the program. 
+Since it's inception, extensive research has been done on bike-sharing, and on Capital Bikeshare specifically. In 2024, Sadeghvarziri et. al. analyzed the influential factors and dynamics of bikeshare utilization in DC. This study included more than 3 million ride obvervations, and concluded temporal trends highlighted peak mid-weekday ridership, aligning with daily work commutes, and that docked bikes are favored on weekdays, electric bikes on weekends, and members are less likely to choose classic bikes. (Sadeghvaziri et. al., 2024). This valuable information can be used to make data-driven decisions about the program. 
 
-Additionally, bikesharing in DC plays an integral role in transit accessibility in DC. In 2024, Tushar & Buehler (2024), found more bike trails, bike lanes, and metrorail stations within 1 mi of neighborhood docking stations and shorter distances between neighborhood docking stations are associated with more bikeshare trips. This reinforces the importance of infrastructure with respect to attracting bikeshare users (Tushar & Buehler 2024). 
+Additionally, bikesharing in DC plays an integral role in transit accessibility in DC. In 2024, Tushar & Buehler (2024), found more bike trails, bike lanes, and metrorail stations within one mile of neighborhood docking stations and shorter distances between neighborhood docking stations are associated with more bikeshare trips. This reinforces the importance of infrastructure with respect to attracting bikeshare users (Tushar & Buehler 2024). 
 
 ```{r}
 file_path <- file.path(getwd(), "202410-capitalbikeshare-tripdata.csv")
@@ -83,7 +83,7 @@ We began this project by evaluating the dataset for completeness and modified va
 1. There are data points where information like start_station_name & id , end_station_name & id , and end_lat and end_lng are missing. 
 `r colSums(is.na(capital_bikeshare))`.
 
-Dropping the `r colSums(is.na(capital_bikeshare))["end_lat"]` rows as they consistute only `r colSums(is.na(capital_bikeshare))["end_lat"]/nrow(capital_bikeshare)*100` percent of the dataset. 
+Dropping the `r colSums(is.na(capital_bikeshare))["end_lat"]` rows as they constitute only `r colSums(is.na(capital_bikeshare))["end_lat"]/nrow(capital_bikeshare)*100` percent of the dataset. 
 
 ```{r}
 capital_bikeshare <- capital_bikeshare %>%
@@ -169,6 +169,20 @@ capital_bikeshare_clean <- capital_bikeshare_clean[-outliers, ]
 ```
 
 After cleaning the dataset the number of rows are `r nrow(capital_bikeshare_clean)`.
+
+The features considered for analysis are as follows:
+
+`rideable_type`: This refers to the type of bike or vehicle used for the ride, such as electric bikes or classic bike.
+
+`member_casual`: This variable categorizes users based on their membership status. "Member" refers to users who have a subscription or membership, while "Casual" refers to users who use the service on an ad-hoc, non-subscription basis.
+
+`distance_miles`: This represents the distance traveled during the ride, measured in miles. It quantifies how far the rider has traveled using the bike-sharing service.
+
+`ride_duration_mins`: This variable refers to the total time, in minutes, that the ride lasts. It measures how long the bike or vehicle is used during each ride.
+
+`start_time_period`: This represents the time of day during which the ride starts, such as morning, afternoon, or evening. It helps to analyze patterns based on the time of use.
+
+`day_type`: This variable refers to the type of day, such as weekdays (Monday to Friday) or weekends (Saturday-Sunday). This is useful for understanding usage patterns depending on the type of day.
 
 # Exploratory Data Analysis
 This project aims to predict user type (member versus casual) based on trip characteristics. Our exploratory data analysis focused first on understanding the fundamental shape of the dataset's variables, and then on the relationship between the features and the predictor (member_casual). We used this information both to guide how we added features to the models, as well as to bolster the resultant findings from the models. 
@@ -267,15 +281,14 @@ user_type_df <- as.data.frame(user_type_counts)
 ```{r}
 user_type_df <- user_type_df %>%
   mutate(percentage = round(Freq / sum(Freq) * 100, 1))
-
-
 ggplot(user_type_df, aes(x = "", y = Freq, fill = Var1)) + 
   geom_bar(stat = "identity", width = 1) + 
   coord_polar(theta = "y") + 
   labs(title = "Proportion of User Types (Member vs Casual)") +
   scale_fill_manual(values = c("member" = "blue", "casual" = "green")) +
   theme_void() +
-  geom_text(aes(label = paste("\n", percentage, "%")), position = position_stack(vjust = 0.5))
+  geom_text(aes(label = paste(Var1, "\n", percentage, "%")), position = position_stack(vjust = 0.5)) + 
+  theme(legend.position = "none")
 ```
 
 There is a higher percentage of member-type riders in October.
@@ -314,6 +327,7 @@ ggplot(capital_bikeshare_clean, aes(x = day_type, fill = interaction(member_casu
   theme_minimal()
 ```
 - Overall, there are fewer rides on weekends, with a significant decrease in rides by member-type users during the weekend.
+
 #Conclusion on EDA.
 The analysis of the Capital Bikeshare dataset for October 2024 provides clear distinctions between the usage patterns of members and casual users, highlighting their differing motivations and behaviors. Members, who represent the majority of rides, exhibit consistent weekday activity, particularly during peak commuting hours. This behavior aligns with practical and routine travel needs, such as commuting or regular errands. In contrast, casual users are more active on weekends and prefer shorter trips, suggesting their primary use is leisure-oriented.
 
@@ -379,17 +393,7 @@ This analysis focuses on building a decision tree model to explore how features 
 We assign each observation a fold number ranging from 1 to 5. This division allows each fold to act as a test set in turn while the rest of the data is used for training.
 
 *Decision Tree Model Training*
-We use the `rpart` package in R to build a decision tree classifier. The target variable, member_casual, is predicted based on the following features:
-
-`rideable_type`: Type of bike.
-
-`distance_miles`: Distance traveled in miles.
-
-`ride_duration_mins`: Duration of the ride in minutes.
-
-`start_time_period`: Time period when the ride started (e.g., morning, afternoon).
-
-`day_type`: Type of day (e.g., weekday or weekend).
+We use the `rpart` package in R to build a decision tree classifier. The target variable, member_casual, is predicted based on features - `rideable_type`, `distance_miles`, `ride_duration_mins`, `start_time_period`, `day_type`.
 
 For each fold, the decision tree model is trained on the training dataset using the rpart function, with the method specified as "class" since it is a classification problem. The model is then summarized to obtain key information about the tree's structure.
 
