@@ -78,6 +78,8 @@ colnames(capital_bikeshare)
 
 # Preprocessing:
 
+We began this project by evaluating the dataset for completeness and modified variables for usability. 
+
 1. There are data points where information like start_station_name & id , end_station_name & id , and end_lat and end_lng are missing. 
 `r colSums(is.na(capital_bikeshare))`.
 
@@ -171,7 +173,7 @@ After cleaning the dataset the number of rows are `r nrow(capital_bikeshare_clea
 # Exploratory Data Analysis
 This project aims to predict user type (member versus casual) based on trip characteristics. Our exploratory data analysis focused first on understanding the fundamental shape of the dataset's variables, and then on the relationship between the features and the predictor (member_casual). We used this information both to guide how we added features to the models, as well as to bolster the resultant findings from the models. 
 
-## 1. Frequency of electric bike versus classic bike rentals
+## Frequency of electric bike versus classic bike rentals
 ```{r}
 
 bike_type_counts <- table(capital_bikeshare_clean$rideable_type)
@@ -187,9 +189,9 @@ ggplot(bike_type_df, aes(x = Var1, y = Freq, fill = Var1)) +
   theme(legend.position = "none")
 ```
 
-- There is a higher frequency of electric bike rentals compared to classic bikes in the dataset indicates a preference for electric bikes. 
+There is a higher frequency of electric bike rentals compared to classic bikes in the dataset indicates a preference for electric bikes. 
 
-## 2. Distribution of duration rides on electric bike versus classic bike
+## Distribution of duration rides on electric bike versus classic bike
 
 *Histogram*
 ```{r}
@@ -490,11 +492,17 @@ summary(riderLogit10)
 ```
 
 The intercept is log-odds 1.52, the log-odds of being a member when the bike is a classic, ride duration and distance are 0, it is the afternoon, and it is a weekday.
+
 Electric bike (versus classic bike) reduces the log-odds of being a member by log-odds 0.631.
+
 Each additional minute of ride duration decrease the log-odds of being a member by 0.062.
-Each additional mile of distance ridden increases the log-odds of being a member b 0.12
+
+Each additional mile of distance ridden increases the log-odds of being a member b 0.12.
+
 Evening, Late evening, Mid-morning, Morning increase the log-odds of being a member compared to afternoon. 
+
 Early morning, midday, and Night are not statistically significant at alpha = 0.05.
+
 Weekend rides reduce the likelihood of being a member by log-odds 0.42.
 The interaction term indicates that for each additional minute of ride duration on an electric bike, the negative effect of ride duration (see above) on the log-odds of being a member is reduced by 0.04. This means longer rides on electric bikes are less strongly associated with with casual riders on classic bikes.
 
@@ -504,18 +512,27 @@ The interaction term indicates that for each additional minute of ride duration 
 exp(coef(riderLogit10))
 ```
 When the log-odds are exponentiated, we can use the odds ratios (OR) to better understand the impact of the variables.
+
 The intercept is 4.559 meaning the odds of being a member are 4.56 times higher than being a casual user when the bike is a classic, it is a weekday afternoon, and ride duration and distance are 0.
+
 The odds ratio for electric bike is 0.541, meaning riders on electric bikes are 46% (1-0.541) less likely to be members compared to classic bikes.
+
 The odds ratio for duraiton is 0.94, meaning each additional minute of ride duration decreases the odds of being a member by 6% (1-0.94).
+
 The odds ratio for distance is 1.127, meaning each additional mile of distance increases the odds of being a member by 13%.
+
 The odds ratio for morning rides is 1.499, meaning meaning morning rides are 50% more likely to be a member than afternoon rides.
+
 The odds ratio for mid-morning is 1.080, meaning odds of being a member is 8% higher than in the afternoon. 
+
 The odds ratio for evening is 1.098, meaning the odds of being a member is 9.8% higher than in the afternoon.
+
 The odds ratio for late evening is 1.10, meaning the odds of being a memberis 10% higher than in the afternoon.
+
 The odds ratio for weekend rides is 0.568, meaning riders on weekends are 34% (1-0.658) less likely to be members.
+
 The odds ratio for the interaction between bike type and duration is 1.041, meaning each additional minute of ride time on electric bikes increases the odds of being a memebr by 4.1%, which counteracts the negative effect of longer rides overall.
 
-Riders are overall more likely to be members. Electric bikes and longer rides reduce the odds, though less so if the longer ride is on an electric bike. Longer distances, increase the odds of membership, while weekends reduce the odds. Morning rides strongly increase the odds of membership.
 
 #Fit and Accuracy Testing
 ```{r}
@@ -594,7 +611,22 @@ riderLogit10pr2
 ```
 
 The McFadden's R-square is 0.0457 or (4.57%), which indicates this model explains a small but meaningful portion of variation in outcome compared to the null model. 
+
+
+# Conclusions
+
+Riders are overall more likely to be members. Electric bikes and longer rides reduce the odds, though less so if the longer ride is on an electric bike. Longer distances increase the odds of membership, while weekends reduce the odds. Morning rides strongly increase the odds of membership.
+
+While the decision tree was not highly accurate for predicting member type (~31%), the logistic regression model was approximately 70% accurate.This is a reasonable result given the small number of variables given. 
+
+Additionally, this dataset is a small snapshot of users and may not accurately reflect the true distribution of users over the course of the year. In order to accommodate the imbalance in the classes, we could create a subset sample that oversamples the casual riders (the minority class) and undersamples the member riders (the majority class), to create a balanced sample for the the analysis. However we did not feel the imbalance was so extreme that this would be necessary. Additionally, we suspect that if an entire year were sampled, the classes may be more balanced. The results of the study by Sadeghvazi et al. (2024) were likely different, and even opposite, from ours because they examined data from an entire year of usage. 
+
+There are many additional factors that likely affect class distribution and bike usage including time of year/season, weather, sunset times. Capital Bikeshare usage is also likely affected by geospatial factors like distance between home and a docking station, and distance to other forms of public transit. Finally, socioeconomic factors also likely have a significant impact. Future research might examine an integration of these variables into the current model for more accurate outcomes.
+
+
+
 This dataset is a small snapshot of users and is only for October. It may not accurately reflect the true distribution of users over the year. In order to accommodate the imbalance in the classes, we could create a subset sample that oversamples the casual riders (the minority class) and undersamples the member riders (the majority class), to create a balanced sample for the the analysis. However, we did not feel the imbalance was so extreme that this would be necessary. Additionally, we suspect that the classes may be more balanced if an entire year was sampled. Many additional factors likely affect class distribution and bike usage, including time of year/season, weather, and sunset times. A dataset of the entire year would likely contain at least 10-12 million observations, which would require more computing power than we have.
+
 
 # References
 
