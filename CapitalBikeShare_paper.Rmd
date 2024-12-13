@@ -1,5 +1,5 @@
 ---
-title: "Analysis and modelling on the Capital Bikeshare data - October 2024"
+title: "Predicting Capital Bikeshare User-type, October 2024"
 author: "[Anusha Umashankar](https://github.com/Anusha-raju)| [Aidan Carlisle](https://github.com/acarlisle8)| [Rachel Thomas](https://github.com/releered)| [Sayan Patra](https://github.com/Sayanpatraa) - Group 8 "
 # date: "today"
 date: "`r Sys.Date()`"
@@ -51,6 +51,7 @@ library(car)
 library(pROC)
 library(rattle)
 library(caret) 
+library(pscl)
 ```
 
 # Introduction: 
@@ -160,7 +161,9 @@ capital_bikeshare_clean <- capital_bikeshare_clean[-outliers, ]
 
 After cleaning the dataset the number of rows are `r nrow(capital_bikeshare_clean)`.
 
-# Visualizations:
+# Exploratory Data Analysis
+This project aims to predict user type (member versus casual) based on trip characteristics. Our exploratory data analysis focused first on understanding the fundamental shape of the dataset's variables, and then on the relationship between the features and the predictor (member_casual). We used this information both to guide how we added features to the models, as well as to bolster the resultant findings from the models. 
+
 ## 1. Frequency of electric bike versus classic bike rentals
 ```{r}
 
@@ -177,7 +180,7 @@ ggplot(bike_type_df, aes(x = Var1, y = Freq, fill = Var1)) +
   theme(legend.position = "none")
 ```
 
-- The higher frequency of electric bike rentals compared to classic bikes in the dataset indicates a preference for electric bikes. 
+- There is a higher frequency of electric bike rentals compared to classic bikes in the dataset indicates a preference for electric bikes. 
 
 ## 2. Distribution of duration rides on electric bike versus classic bike
 
@@ -206,7 +209,7 @@ ggplot(capital_bikeshare_clean, aes(x = rideable_type, y = ride_duration_mins, f
   theme_minimal()
 ```
 
-- The distribution of ride duration by bike type is right-skewed, and the box plot highlights a significant number of extreme outliers.
+The distribution of ride duration by bike type is right-skewed, and the box plot highlights a significant number of extreme outliers.
 
 
 ## Distribution of distances ride by bike type. 
@@ -238,7 +241,7 @@ ggplot(capital_bikeshare_clean, aes(x = rideable_type, y = distance_miles, fill 
 ```
 
 
-- The distribution of ride distance by bike type is slightly more right-skewed for classic bikes compared to electric bikes, with electric bikes exhibiting a wider distribution than classic bikes.
+The distribution of ride distance by bike type is slightly more right-skewed for classic bikes compared to electric bikes, with electric bikes exhibiting a wider distribution than classic bikes.
 
 
 ## Frequency of user types
@@ -266,7 +269,7 @@ ggplot(user_type_df, aes(x = "", y = Freq, fill = Var1)) +
   geom_text(aes(label = paste("\n", percentage, "%")), position = position_stack(vjust = 0.5))
 ```
 
-- There is a significantly higher number of member-type riders in October.
+There is a higher percentage of member-type riders in October.
 
 
 
@@ -288,7 +291,7 @@ ggplot(user_bike_counts, aes(x = rideable_type, y = Freq, fill = member_casual))
 ```
 
 
-- Electric bikes have a higher proportion of member-type riders compared to casual-type riders.
+Electric bikes have a higher proportion of member-type riders compared to casual-type riders.
 
 
 ## Ride characteristics on weekdays vs weekends
@@ -306,12 +309,15 @@ ggplot(capital_bikeshare_clean, aes(x = day_type, fill = interaction(member_casu
 
 # Predict the rider's class based on trip characteristics
 
+Our goal was to use trip characteristics to predict whether users are members or casual. This is a binary classification problem, so we utilitized models suited to this type of problem: decision tree and logistic regression. 
+
 # Decision Tree
+
 
 # Logistical Regression Model
 Model selection started with duration (ride_duration_mins) only and then added bike type (rideable_type) because the decision tree indicated these were the most important variables. Because this dataset does not have many variables, and nearly all are statistically significant in the full model, we elected a stepwise approach to model building, and used ANOVA to compare model quality.
 
-```{r, eval=FALSE}
+```{r, echo=TRUE, include=FALSE}
 riderLogit01 <- glm(member_casual ~ ride_duration_mins, data = capital_bikeshare_clean, family = "binomial")
 summary(riderLogit01)
 
@@ -348,7 +354,7 @@ summary(riderLogit11)
 
 
 ANOVA to compare models and select the best
-```{r, eval=FALSE}
+```{r, echo=TRUE, include=FALSE}
 anova_result <- anova(riderLogit01, riderLogit02, riderLogit03, riderLogit04, riderLogit05, riderLogit06, riderLogit07, riderLogit08, riderLogit09, test = "Chisq")
 print(anova_result)
 
@@ -470,7 +476,7 @@ To improve sensitivity and specificity, we changed the cutoff to 0.61 (increased
 ```{r}
 predicted_probs10 <- predict(riderLogit10, newdata = capital_bikeshare_clean, type = "response")
 roc_curve10 <- roc(response = capital_bikeshare_clean$member_casual, predicted_probs10, levels = c("casual", "member"))
-plot(roc_curve, main = "ROC Curve for Logistic Regression Model", col = "blue", lwd = 2)
+plot(roc_curve10, main = "ROC Curve for Logistic Regression Model", col = "blue", lwd = 2)
 
 auc_value10 <- auc(roc_curve10)
 print(paste("AUC (ModelMetrics):", round(auc_value10, 4)))
